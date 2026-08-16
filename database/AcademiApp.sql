@@ -28,7 +28,7 @@ CREATE TABLE curso (
     CONSTRAINT chk_curso_precio
         CHECK (precio >= 0),
     CONSTRAINT chk_curso_estado
-        CHECK (estado IN ('ACTIVO', 'FINALIZADO'))
+        CHECK (estado IN ('ACTIVO', 'FINALIZADO', 'CANCELADO'))
 );
 
 -- 2. GRUPO
