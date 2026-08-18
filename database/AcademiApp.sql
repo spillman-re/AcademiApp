@@ -45,7 +45,7 @@ CREATE TABLE grupo (
         ON DELETE NO ACTION
         ON UPDATE NO ACTION,
     CONSTRAINT chk_grupo_estado
-        CHECK (estado IN ('ACTIVO', 'FINALIZADO'))
+        CHECK (estado IN ('ACTIVO', 'FINALIZADO', 'CANCELADO'))
 );
 
 -- 3. HORARIO_CLASE
