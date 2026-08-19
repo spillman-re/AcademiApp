@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { DatabaseModule } from './database/database.module';
 import { CursoModule } from './curso/curso.module';
 import { GrupoModule } from './grupo/grupo.module';
+import { HorarioClaseModule } from './horario-clase/horario-clase.module';
 
 @Module({
   imports: [
@@ -10,7 +11,7 @@ import { GrupoModule } from './grupo/grupo.module';
       isGlobal: true,
     }),
     DatabaseModule,    
-    CursoModule, GrupoModule,
+    CursoModule, GrupoModule, HorarioClaseModule,
   ]  
 })
 export class AppModule {}
