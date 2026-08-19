@@ -151,11 +151,9 @@ CREATE TABLE inscripcion (
         FOREIGN KEY (id_grupo)
         REFERENCES grupo(id_grupo)
         ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
-    CONSTRAINT uq_estudiante_grupo
-        UNIQUE (id_estudiante, id_grupo),
+        ON UPDATE NO ACTION,    
     CONSTRAINT chk_inscripcion_estado
-        CHECK (estado_inscripcion IN ('ACTIVA', 'FINALIZADA'))
+        CHECK (estado_inscripcion IN ('ACTIVA', 'FINALIZADA', 'CANCELADA'))
 );
 
 -- 8. SESION_CLASE
@@ -441,6 +439,10 @@ ON asignacion_profesor(id_grupo);
 
 CREATE INDEX idx_inscripcion_estudiante
 ON inscripcion(id_estudiante);
+
+CREATE UNIQUE INDEX ux_estudiante_grupo_activa
+ON inscripcion(id_estudiante, id_grupo)
+WHERE estado_inscripcion = 'ACTIVA';
 
 CREATE INDEX idx_inscripcion_grupo
 ON inscripcion(id_grupo);
