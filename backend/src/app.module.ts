@@ -5,6 +5,7 @@ import { CursoModule } from './curso/curso.module';
 import { GrupoModule } from './grupo/grupo.module';
 import { HorarioClaseModule } from './horario-clase/horario-clase.module';
 import { EstudianteModule } from './estudiante/estudiante.module';
+import { ProfesorModule } from './profesor/profesor.module';
 
 @Module({
   imports: [
@@ -12,7 +13,7 @@ import { EstudianteModule } from './estudiante/estudiante.module';
       isGlobal: true,
     }),
     DatabaseModule,    
-    CursoModule, GrupoModule, HorarioClaseModule, EstudianteModule,
+    CursoModule, GrupoModule, HorarioClaseModule, EstudianteModule, ProfesorModule,
   ]  
 })
 export class AppModule {}
