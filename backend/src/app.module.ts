@@ -6,6 +6,7 @@ import { GrupoModule } from './grupo/grupo.module';
 import { HorarioClaseModule } from './horario-clase/horario-clase.module';
 import { EstudianteModule } from './estudiante/estudiante.module';
 import { ProfesorModule } from './profesor/profesor.module';
+import { AsignacionProfesorModule } from './asignacion-profesor/asignacion-profesor.module';
 
 @Module({
   imports: [
@@ -13,7 +14,7 @@ import { ProfesorModule } from './profesor/profesor.module';
       isGlobal: true,
     }),
     DatabaseModule,    
-    CursoModule, GrupoModule, HorarioClaseModule, EstudianteModule, ProfesorModule,
+    CursoModule, GrupoModule, HorarioClaseModule, EstudianteModule, ProfesorModule, AsignacionProfesorModule,
   ]  
 })
 export class AppModule {}
