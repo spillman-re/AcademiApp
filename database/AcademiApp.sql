@@ -80,10 +80,18 @@ CREATE TABLE horario_clase (
 -- 4. ESTUDIANTE
 CREATE TABLE estudiante (
     id_estudiante INT IDENTITY(1,1) PRIMARY KEY,
+
+    codigo_estudiante AS (
+        'EST-' + RIGHT(
+            '000000' + CAST(id_estudiante AS VARCHAR(6)),
+            6
+        )
+    ),
+
     nombres VARCHAR(100) NOT NULL,
     apellidos VARCHAR(100) NOT NULL,
     fecha_nacimiento DATE,
-    telefono VARCHAR(20),    
+    telefono VARCHAR(20),
     fecha_registro DATE NOT NULL DEFAULT CAST(GETDATE() AS DATE),
     estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVO',
 
@@ -421,6 +429,9 @@ ON grupo(id_curso);
 
 CREATE INDEX idx_horario_grupo
 ON horario_clase(id_grupo);
+
+CREATE UNIQUE INDEX ux_estudiante_codigo
+ON estudiante(codigo_estudiante);
 
 CREATE INDEX idx_asignacion_profesor
 ON asignacion_profesor(id_profesor);
