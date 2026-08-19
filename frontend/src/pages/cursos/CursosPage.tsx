@@ -6,16 +6,30 @@ import {
   crearCurso,
   actualizarCurso,
 } from "../../services/cursoService";
+import {
+  crearGrupo,
+  eliminarGrupo as eliminarGrupoApi,
+  actualizarGrupo,
+  obtenerGrupos,
+} from "../../services/grupoService";
 
 import type { Curso } from "../../types/curso";
+import type { Grupo } from "../../types/grupo";
 import type { CursoFormData } from "../../schema/cursoSchema";
+import {
+  type CrearGrupoFormData,
+  type ActualizarGrupoFormData,
+  esCrearGrupoFormData,
+} from "../../schema/grupoSchema";
 
 import CursoTable from "../../components/cursos/CursoTable";
 import CursoForm from "../../components/cursos/CursoForm";
 import Modal from "../../components/ui/Modal";
+import GrupoForm from "../../components/grupos/GrupoForm";
 
 function CursosPage() {
   const [cursos, setCursos] = useState<Curso[]>([]);
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -23,6 +37,10 @@ function CursosPage() {
 
   const [cursoSeleccionado, setCursoSeleccionado] =
     useState<Curso | undefined>();
+  const [cursoParaGrupo, setCursoParaGrupo] =
+    useState<Curso | undefined>();
+  const [grupoSeleccionado, setGrupoSeleccionado] =
+    useState<Grupo | undefined>();
 
   useEffect(() => {
     cargarCursos();
@@ -33,9 +51,13 @@ function CursosPage() {
       setLoading(true);
       setError("");
 
-      const data = await obtenerCursos();
+      const [cursosData, gruposData] = await Promise.all([
+        obtenerCursos(),
+        obtenerGrupos(),
+      ]);
 
-      setCursos(data);
+      setCursos(cursosData);
+      setGrupos(gruposData);
     } catch {
       setError("No se pudieron cargar los cursos");
     } finally {
@@ -56,6 +78,21 @@ function CursosPage() {
   function cerrarModal() {
     setModalAbierto(false);
     setCursoSeleccionado(undefined);
+  }
+
+  function abrirModalGrupo(curso: Curso) {
+    setGrupoSeleccionado(undefined);
+    setCursoParaGrupo(curso);
+  }
+
+  function abrirModalEditarGrupo(grupo: Grupo) {
+    setGrupoSeleccionado(grupo);
+    setCursoParaGrupo(cursos.find((curso) => curso.id_curso === grupo.id_curso));
+  }
+
+  function cerrarModalGrupo() {
+    setCursoParaGrupo(undefined);
+    setGrupoSeleccionado(undefined);
   }
 
   async function handleGuardarCurso(data: CursoFormData) {
@@ -116,6 +153,74 @@ function CursosPage() {
     }
   }
 
+  async function handleAgregarGrupo(
+    data: CrearGrupoFormData | ActualizarGrupoFormData
+  ) {
+    if (!cursoParaGrupo) {
+      return;
+    }
+
+    try {
+      setError("");
+
+      if (grupoSeleccionado) {
+        const grupoActualizado = await actualizarGrupo(
+          grupoSeleccionado.id_grupo,
+          {
+            nombre_grupo: data.nombre_grupo,
+          }
+        );
+
+        setGrupos((gruposActuales) =>
+          gruposActuales.map((grupo) =>
+            grupo.id_grupo === grupoActualizado.id_grupo
+              ? grupoActualizado
+              : grupo
+          )
+        );
+      } else {
+        if (!esCrearGrupoFormData(data)) {
+          return;
+        }
+
+        const nuevoGrupo = await crearGrupo({
+          id_curso: cursoParaGrupo.id_curso,
+          nombre_grupo: data.nombre_grupo,
+          fecha_inicio: data.fecha_inicio,
+        });
+
+        setGrupos((gruposActuales) => [
+          ...gruposActuales,
+          nuevoGrupo,
+        ]);
+      }
+
+      cerrarModalGrupo();
+    } catch {
+      setError(
+        grupoSeleccionado
+          ? "No se pudo actualizar el grupo"
+          : "No se pudo crear el grupo"
+      );
+    }
+  }
+  
+
+  async function handleEliminarGrupo(id: number) {
+    try {
+      setError("");
+
+      await eliminarGrupoApi(id);
+
+      setGrupos((gruposActuales) =>
+        gruposActuales.filter((grupo) => grupo.id_grupo !== id)
+      );
+    } catch {
+      setError("No se pudo cancelar el grupo");
+      throw new Error("No se pudo cancelar el grupo");
+    }
+  }
+
   if (loading) {
     return <p>Cargando cursos...</p>;
   }
@@ -147,8 +252,12 @@ function CursosPage() {
       {/* Tabla */}
       <CursoTable
         cursos={cursos}
+        grupos={grupos}
         onEditar={abrirModalEditar}
         onEliminar={handleEliminarCurso}
+        onAgregarGrupo={abrirModalGrupo}
+        onEditarGrupo={abrirModalEditarGrupo}
+        onEliminarGrupo={handleEliminarGrupo}
       />
 
       {/* Modal */}
@@ -164,6 +273,17 @@ function CursosPage() {
         <CursoForm
           curso={cursoSeleccionado}
           onSubmit={handleGuardarCurso}
+        />
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(cursoParaGrupo)}
+        onClose={cerrarModalGrupo}
+        title={`${grupoSeleccionado ? "Editar grupo" : "Nuevo grupo"}${cursoParaGrupo ? `: ${cursoParaGrupo.nombre_curso}` : ""}`}
+      >
+        <GrupoForm
+          grupo={grupoSeleccionado}
+          onSubmit={handleAgregarGrupo}
         />
       </Modal>
     </div>
