@@ -162,6 +162,8 @@ CREATE TABLE sesion_clase (
     id_grupo INT NOT NULL,
     id_horario INT,
     fecha_programada DATE NOT NULL,
+    hora_inicio TIME NOT NULL,
+    hora_fin TIME NOT NULL,
     tema VARCHAR(200),
     estado_sesion VARCHAR(20) NOT NULL DEFAULT 'PROGRAMADA',
     observacion VARCHAR(MAX),
@@ -171,11 +173,16 @@ CREATE TABLE sesion_clase (
         REFERENCES grupo(id_grupo)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION,
+
     CONSTRAINT fk_sesion_horario
         FOREIGN KEY (id_horario)
         REFERENCES horario_clase(id_horario)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION,
+
+    CONSTRAINT chk_sesion_hora
+        CHECK (hora_inicio < hora_fin),
+
     CONSTRAINT chk_sesion_estado
         CHECK (
             estado_sesion IN (

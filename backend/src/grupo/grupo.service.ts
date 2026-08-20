@@ -157,10 +157,10 @@ export class GrupoService {
     const pool = this.databaseService.getPool();
 
     const result = await pool.request().input('id', id).query(`
-            SELECT *
-            FROM grupo
-            WHERE id_grupo = @id
-        `);
+      SELECT *
+      FROM grupo
+      WHERE id_grupo = @id
+    `);
 
     if (result.recordset.length === 0) {
       throw new NotFoundException(`El grupo con id ${id} no fue encontrado.`);
@@ -172,22 +172,42 @@ export class GrupoService {
       throw new BadRequestException('El grupo ya no se encuentra activo.');
     }
 
-    // Finalizar grupo
+    // ============================================================
+    // FINALIZAR GRUPO
+    // ============================================================
+
     await pool.request().input('id', id).query(`
-            UPDATE grupo
-            SET estado = 'FINALIZADO'
-            WHERE id_grupo = @id
-        `);
+      UPDATE grupo
+      SET estado = 'FINALIZADO'
+      WHERE id_grupo = @id
+    `);
 
-    // Finalizar las inscripciones activas del grupo
+    // ============================================================
+    // FINALIZAR INSCRIPCIONES ACTIVAS
+    // ============================================================
+
     await pool.request().input('id_grupo', id).query(`
-            UPDATE inscripcion
-            SET estado_inscripcion = 'FINALIZADA'
-            WHERE id_grupo = @id_grupo
-            AND estado_inscripcion = 'ACTIVA'
-        `);
+      UPDATE inscripcion
+      SET estado_inscripcion = 'FINALIZADA'
+      WHERE id_grupo = @id_grupo
+      AND estado_inscripcion = 'ACTIVA'
+    `);
 
-    // Revisar si el curso también debe finalizar
+    // ============================================================
+    // CANCELAR SESIONES PROGRAMADAS
+    // ============================================================
+
+    await pool.request().input('id_grupo', id).query(`
+      UPDATE sesion_clase
+      SET estado_sesion = 'CANCELADA'
+      WHERE id_grupo = @id_grupo
+      AND estado_sesion = 'PROGRAMADA'
+    `);
+
+    // ============================================================
+    // ACTUALIZAR ESTADO DEL CURSO
+    // ============================================================
+
     await this.actualizarEstadoCurso(grupo.id_curso);
 
     return {

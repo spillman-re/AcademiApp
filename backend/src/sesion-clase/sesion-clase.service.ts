@@ -1,0 +1,671 @@
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+
+import { DatabaseService } from 'src/database/database.service';
+
+import { CreateSesionClaseDto } from './dto/create-sesion-clase.dto';
+import { UpdateSesionClaseDto } from './dto/update-sesion-clase.dto';
+
+@Injectable()
+export class SesionClaseService {
+  constructor(
+    private readonly databaseService: DatabaseService,
+  ) {}
+
+  // ============================================================
+  // OBTENER TODAS
+  // ============================================================
+
+  async getSesiones() {
+    const pool = this.databaseService.getPool();
+
+    const result = await pool.request().query(`
+      SELECT
+        s.*,
+        g.nombre_grupo,
+        h.dia_semana
+      FROM sesion_clase s
+      INNER JOIN grupo g
+        ON s.id_grupo = g.id_grupo
+      LEFT JOIN horario_clase h
+        ON s.id_horario = h.id_horario
+      ORDER BY
+        s.fecha_programada,
+        s.hora_inicio;
+    `);
+
+    return result.recordset;
+  }
+
+  // ============================================================
+  // OBTENER UNA
+  // ============================================================
+
+  async getSesion(id: number) {
+    const pool = this.databaseService.getPool();
+
+    const result = await pool
+      .request()
+      .input('id', id)
+      .query(`
+        SELECT
+          s.*,
+          g.nombre_grupo,
+          h.dia_semana
+        FROM sesion_clase s
+        INNER JOIN grupo g
+          ON s.id_grupo = g.id_grupo
+        LEFT JOIN horario_clase h
+          ON s.id_horario = h.id_horario
+        WHERE s.id_sesion = @id;
+      `);
+
+    if (result.recordset.length === 0) {
+      throw new NotFoundException(
+        `La sesión con id ${id} no fue encontrada.`,
+      );
+    }
+
+    return result.recordset[0];
+  }
+
+  // ============================================================
+  // CREAR UNA SESIÓN MANUALMENTE
+  // ============================================================
+
+  async createSesion(sesion: CreateSesionClaseDto) {
+    const pool = this.databaseService.getPool();
+
+    // ----------------------------------------------------------
+    // Verificar grupo
+    // ----------------------------------------------------------
+
+    const grupo = await pool
+      .request()
+      .input('id_grupo', sesion.id_grupo)
+      .query(`
+        SELECT
+          id_grupo,
+          estado,
+          fecha_inicio
+        FROM grupo
+        WHERE id_grupo = @id_grupo;
+      `);
+
+    if (grupo.recordset.length === 0) {
+      throw new NotFoundException(
+        `El grupo con id ${sesion.id_grupo} no fue encontrado.`,
+      );
+    }
+
+    const grupoActual = grupo.recordset[0];
+
+    if (grupoActual.estado !== 'ACTIVO') {
+      throw new BadRequestException(
+        'No se puede crear una sesión para un grupo que no está activo.',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Verificar fecha
+    // ----------------------------------------------------------
+
+    if (
+      new Date(sesion.fecha_programada) <
+      new Date(grupoActual.fecha_inicio)
+    ) {
+      throw new BadRequestException(
+        'La fecha de la sesión no puede ser anterior a la fecha de inicio del grupo.',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Verificar horario
+    // ----------------------------------------------------------
+
+    if (sesion.id_horario !== undefined) {
+      const horario = await pool
+        .request()
+        .input('id_horario', sesion.id_horario)
+        .input('id_grupo', sesion.id_grupo)
+        .query(`
+          SELECT
+            id_horario,
+            id_grupo,
+            dia_semana,
+            hora_inicio,
+            hora_fin
+          FROM horario_clase
+          WHERE id_horario = @id_horario
+          AND id_grupo = @id_grupo;
+        `);
+
+      if (horario.recordset.length === 0) {
+        throw new BadRequestException(
+          'El horario indicado no pertenece al grupo.',
+        );
+      }
+    }
+
+    // ----------------------------------------------------------
+    // Verificar solapamiento
+    // ----------------------------------------------------------
+
+    const conflicto = await pool
+      .request()
+      .input('id_grupo', sesion.id_grupo)
+      .input('fecha_programada', sesion.fecha_programada)
+      .input('hora_inicio', sesion.hora_inicio)
+      .input('hora_fin', sesion.hora_fin)
+      .query(`
+        SELECT id_sesion
+        FROM sesion_clase
+        WHERE id_grupo = @id_grupo
+        AND fecha_programada = @fecha_programada
+        AND hora_inicio < CAST(@hora_fin AS TIME)
+        AND hora_fin > CAST(@hora_inicio AS TIME)
+        AND estado_sesion <> 'CANCELADA';
+      `);
+
+    if (conflicto.recordset.length > 0) {
+      throw new BadRequestException(
+        'Ya existe una sesión que se solapa con este horario.',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Crear sesión
+    // ----------------------------------------------------------
+
+    const result = await pool
+      .request()
+      .input('id_grupo', sesion.id_grupo)
+      .input('id_horario', sesion.id_horario ?? null)
+      .input('fecha_programada', sesion.fecha_programada)
+      .input('hora_inicio', sesion.hora_inicio)
+      .input('hora_fin', sesion.hora_fin)
+      .input('tema', sesion.tema ?? null)
+      .input('observacion', sesion.observacion ?? null)
+      .query(`
+        INSERT INTO sesion_clase (
+          id_grupo,
+          id_horario,
+          fecha_programada,
+          hora_inicio,
+          hora_fin,
+          tema,
+          observacion
+        )
+        OUTPUT INSERTED.*
+        VALUES (
+          @id_grupo,
+          @id_horario,
+          @fecha_programada,
+          CAST(@hora_inicio AS TIME),
+          CAST(@hora_fin AS TIME),
+          @tema,
+          @observacion
+        );
+      `);
+
+    return result.recordset[0];
+  }
+
+  // ============================================================
+  // GENERAR SESIONES A PARTIR DE LOS HORARIOS
+  // ============================================================
+
+  async generarSesiones(
+    idGrupo: number,
+    fechaHasta: string,
+  ) {
+    const pool = this.databaseService.getPool();
+
+    // ----------------------------------------------------------
+    // Obtener grupo
+    // ----------------------------------------------------------
+
+    const grupo = await pool
+      .request()
+      .input('id_grupo', idGrupo)
+      .query(`
+        SELECT
+          id_grupo,
+          estado,
+          fecha_inicio
+        FROM grupo
+        WHERE id_grupo = @id_grupo;
+      `);
+
+    if (grupo.recordset.length === 0) {
+      throw new NotFoundException(
+        `El grupo con id ${idGrupo} no fue encontrado.`,
+      );
+    }
+
+    const grupoActual = grupo.recordset[0];
+
+    if (grupoActual.estado !== 'ACTIVO') {
+      throw new BadRequestException(
+        'No se pueden generar sesiones para un grupo que no está activo.',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Validar rango
+    // ----------------------------------------------------------
+
+    const fechaInicio = new Date(grupoActual.fecha_inicio);
+    const fechaFin = new Date(fechaHasta);
+
+    if (fechaFin < fechaInicio) {
+      throw new BadRequestException(
+        'La fecha hasta no puede ser anterior a la fecha de inicio del grupo.',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Obtener horarios actuales del grupo
+    // ----------------------------------------------------------
+
+    const horarios = await pool
+      .request()
+      .input('id_grupo', idGrupo)
+      .query(`
+        SELECT
+          id_horario,
+          dia_semana,
+          hora_inicio,
+          hora_fin
+        FROM horario_clase
+        WHERE id_grupo = @id_grupo
+        ORDER BY
+          CASE dia_semana
+            WHEN 'LUNES' THEN 1
+            WHEN 'MARTES' THEN 2
+            WHEN 'MIERCOLES' THEN 3
+            WHEN 'JUEVES' THEN 4
+            WHEN 'VIERNES' THEN 5
+            WHEN 'SABADO' THEN 6
+            WHEN 'DOMINGO' THEN 7
+          END,
+          hora_inicio;
+      `);
+
+    if (horarios.recordset.length === 0) {
+      throw new BadRequestException(
+        'El grupo no tiene horarios configurados.',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Recorrer fechas
+    // ----------------------------------------------------------
+
+    const sesionesCreadas: any[] = [];
+
+    const fechaActual = new Date(fechaInicio);
+
+    while (fechaActual <= fechaFin) {
+      const diaSemana = this.obtenerDiaSemana(fechaActual);
+
+      const horariosDelDia = horarios.recordset.filter(
+        (horario) => horario.dia_semana === diaSemana,
+      );
+
+      for (const horario of horariosDelDia) {
+        const fechaSQL = this.formatearFecha(fechaActual);
+
+        // ------------------------------------------------------
+        // Evitar duplicados
+        // ------------------------------------------------------
+
+        const existente = await pool
+          .request()
+          .input('id_grupo', idGrupo)
+          .input('id_horario', horario.id_horario)
+          .input('fecha_programada', fechaSQL)
+          .query(`
+            SELECT id_sesion
+            FROM sesion_clase
+            WHERE id_grupo = @id_grupo
+            AND id_horario = @id_horario
+            AND fecha_programada = @fecha_programada;
+          `);
+
+        if (existente.recordset.length > 0) {
+          continue;
+        }
+
+        // ------------------------------------------------------
+        // Convertir correctamente las horas
+        // ------------------------------------------------------
+
+        const horaInicio = this.formatearHora(
+          horario.hora_inicio,
+        );
+
+        const horaFin = this.formatearHora(
+          horario.hora_fin,
+        );
+
+        // ------------------------------------------------------
+        // Crear sesión
+        // ------------------------------------------------------
+
+        const result = await pool
+          .request()
+          .input('id_grupo', idGrupo)
+          .input('id_horario', horario.id_horario)
+          .input('fecha_programada', fechaSQL)
+          .input('hora_inicio', horaInicio)
+          .input('hora_fin', horaFin)
+          .query(`
+            INSERT INTO sesion_clase (
+              id_grupo,
+              id_horario,
+              fecha_programada,
+              hora_inicio,
+              hora_fin
+            )
+            OUTPUT INSERTED.*
+            VALUES (
+              @id_grupo,
+              @id_horario,
+              @fecha_programada,
+              CAST(@hora_inicio AS TIME),
+              CAST(@hora_fin AS TIME)
+            );
+          `);
+
+        sesionesCreadas.push(result.recordset[0]);
+      }
+
+      fechaActual.setDate(
+        fechaActual.getDate() + 1,
+      );
+    }
+
+    return {
+      mensaje: 'Sesiones generadas correctamente.',
+      cantidad: sesionesCreadas.length,
+      sesiones: sesionesCreadas,
+    };
+  }
+
+  // ============================================================
+  // ACTUALIZAR SESIÓN
+  // ============================================================
+
+  async updateSesion(
+    id: number,
+    sesion: UpdateSesionClaseDto,
+  ) {
+    const pool = this.databaseService.getPool();
+
+    // ----------------------------------------------------------
+    // Obtener sesión actual
+    // ----------------------------------------------------------
+
+    const existente = await pool
+      .request()
+      .input('id', id)
+      .query(`
+        SELECT *
+        FROM sesion_clase
+        WHERE id_sesion = @id;
+      `);
+
+    if (existente.recordset.length === 0) {
+      throw new NotFoundException(
+        `La sesión con id ${id} no fue encontrada.`,
+      );
+    }
+
+    const actual = existente.recordset[0];
+
+    // ----------------------------------------------------------
+    // Solo modificar sesiones programadas
+    // ----------------------------------------------------------
+
+    if (actual.estado_sesion !== 'PROGRAMADA') {
+      throw new BadRequestException(
+        'Solo se pueden modificar sesiones que están programadas.',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Mantener valores actuales
+    // ----------------------------------------------------------
+
+    const fechaProgramada =
+      sesion.fecha_programada ??
+      actual.fecha_programada;
+
+    const horaInicio =
+      sesion.hora_inicio ??
+      this.formatearHora(actual.hora_inicio);
+
+    const horaFin =
+      sesion.hora_fin ??
+      this.formatearHora(actual.hora_fin);
+
+    const idHorario =
+      sesion.id_horario !== undefined
+        ? sesion.id_horario
+        : actual.id_horario;
+
+    const tema =
+      sesion.tema !== undefined
+        ? sesion.tema
+        : actual.tema;
+
+    const observacion =
+      sesion.observacion !== undefined
+        ? sesion.observacion
+        : actual.observacion;
+
+    // ----------------------------------------------------------
+    // Validar horario
+    // ----------------------------------------------------------
+
+    if (idHorario !== null) {
+      const horario = await pool
+        .request()
+        .input('id_horario', idHorario)
+        .input('id_grupo', actual.id_grupo)
+        .query(`
+          SELECT id_horario
+          FROM horario_clase
+          WHERE id_horario = @id_horario
+          AND id_grupo = @id_grupo;
+        `);
+
+      if (horario.recordset.length === 0) {
+        throw new BadRequestException(
+          'El horario indicado no pertenece al grupo.',
+        );
+      }
+    }
+
+    // ----------------------------------------------------------
+    // Verificar solapamiento
+    // ----------------------------------------------------------
+
+    const conflicto = await pool
+      .request()
+      .input('id', id)
+      .input('id_grupo', actual.id_grupo)
+      .input('fecha_programada', fechaProgramada)
+      .input('hora_inicio', horaInicio)
+      .input('hora_fin', horaFin)
+      .query(`
+        SELECT id_sesion
+        FROM sesion_clase
+        WHERE id_grupo = @id_grupo
+        AND fecha_programada = @fecha_programada
+        AND hora_inicio < CAST(@hora_fin AS TIME)
+        AND hora_fin > CAST(@hora_inicio AS TIME)
+        AND id_sesion <> @id
+        AND estado_sesion <> 'CANCELADA';
+      `);
+
+    if (conflicto.recordset.length > 0) {
+      throw new BadRequestException(
+        'La sesión se solapa con otra sesión del mismo grupo.',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Actualizar
+    // ----------------------------------------------------------
+
+    await pool
+      .request()
+      .input('id', id)
+      .input('id_horario', idHorario)
+      .input('fecha_programada', fechaProgramada)
+      .input('hora_inicio', horaInicio)
+      .input('hora_fin', horaFin)
+      .input('tema', tema)
+      .input('observacion', observacion)
+      .query(`
+        UPDATE sesion_clase
+        SET
+          id_horario = @id_horario,
+          fecha_programada = @fecha_programada,
+          hora_inicio = CAST(@hora_inicio AS TIME),
+          hora_fin = CAST(@hora_fin AS TIME),
+          tema = @tema,
+          observacion = @observacion
+        WHERE id_sesion = @id;
+      `);
+
+    const actualizado = await pool
+      .request()
+      .input('id', id)
+      .query(`
+        SELECT *
+        FROM sesion_clase
+        WHERE id_sesion = @id;
+      `);
+
+    return actualizado.recordset[0];
+  }
+
+  // ============================================================
+  // CANCELAR SESIÓN
+  // ============================================================
+
+  async cancelarSesion(id: number) {
+    const pool = this.databaseService.getPool();
+
+    const result = await pool
+      .request()
+      .input('id', id)
+      .query(`
+        UPDATE sesion_clase
+        SET estado_sesion = 'CANCELADA'
+        OUTPUT INSERTED.*
+        WHERE id_sesion = @id
+        AND estado_sesion = 'PROGRAMADA';
+      `);
+
+    if (result.recordset.length === 0) {
+      throw new NotFoundException(
+        `La sesión con id ${id} no fue encontrada o ya no está programada.`,
+      );
+    }
+
+    return result.recordset[0];
+  }
+
+  // ============================================================
+  // MARCAR COMO REALIZADA
+  // ============================================================
+
+  async finalizarSesion(id: number) {
+    const pool = this.databaseService.getPool();
+
+    const result = await pool
+      .request()
+      .input('id', id)
+      .query(`
+        UPDATE sesion_clase
+        SET estado_sesion = 'REALIZADA'
+        OUTPUT INSERTED.*
+        WHERE id_sesion = @id
+        AND estado_sesion = 'PROGRAMADA';
+      `);
+
+    if (result.recordset.length === 0) {
+      throw new BadRequestException(
+        'La sesión no existe o no está programada.',
+      );
+    }
+
+    return result.recordset[0];
+  }
+
+  // ============================================================
+  // HELPERS
+  // ============================================================
+
+  private obtenerDiaSemana(fecha: Date): string {
+    const dias = [
+      'DOMINGO',
+      'LUNES',
+      'MARTES',
+      'MIERCOLES',
+      'JUEVES',
+      'VIERNES',
+      'SABADO',
+    ];
+
+    return dias[fecha.getDay()];
+  }
+
+  private formatearFecha(fecha: Date): string {
+    const year = fecha.getFullYear();
+
+    const month = String(
+      fecha.getMonth() + 1,
+    ).padStart(2, '0');
+
+    const day = String(
+      fecha.getDate(),
+    ).padStart(2, '0');
+
+    return `${year}-${month}-${day}`;
+  }
+
+  private formatearHora(hora: any): string {
+    // SQL Server TIME puede llegar como Date
+    // debido al driver mssql/tedious.
+    //
+    // IMPORTANTE:
+    // usamos UTC porque el Date representa una hora
+    // de SQL Server y no una fecha/hora local.
+
+    if (hora instanceof Date) {
+      const hours = String(
+        hora.getUTCHours(),
+      ).padStart(2, '0');
+
+      const minutes = String(
+        hora.getUTCMinutes(),
+      ).padStart(2, '0');
+
+      return `${hours}:${minutes}`;
+    }
+
+    if (typeof hora === 'string') {
+      return hora.substring(0, 5);
+    }
+
+    return hora;
+  }
+}
