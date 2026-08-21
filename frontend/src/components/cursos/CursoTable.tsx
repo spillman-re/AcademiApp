@@ -1,13 +1,18 @@
 import type { Curso } from "../../types/curso";
 import type { Grupo } from "../../types/grupo";
+import type { Profesor } from "../../types/profesor";
+import type { AsignacionProfesor } from "../../types/asignacionProfesor";
 import { useState } from "react";
 
 
 interface CursoTableProps {
   cursos: Curso[];
   grupos: Grupo[];
+  profesores: Profesor[];
+  asignaciones: AsignacionProfesor[];
   onEditar: (curso: Curso) => void;
   onEliminar: (id: number) => void;
+  onAsignarProfesor: (curso: Curso) => void;
   onAgregarGrupo: (curso: Curso) => void;
   onEditarGrupo: (grupo: Grupo) => void;
   onEliminarGrupo: (id: number) => Promise<void>;
@@ -16,8 +21,11 @@ interface CursoTableProps {
 function CursoTable({
   cursos,
   grupos,
+  profesores,
+  asignaciones,
   onEditar,
   onEliminar,
+  onAsignarProfesor,
   onAgregarGrupo,
   onEditarGrupo,
   onEliminarGrupo,
@@ -124,6 +132,20 @@ function CursoTable({
                           <p className="text-xs text-gray-500">
                             Inicio: {grupo.fecha_inicio.slice(0, 10)}
                           </p>
+                          <p className="text-xs text-gray-500">
+                            Profesor: {asignaciones
+                              .filter((asignacion) => asignacion.id_grupo === grupo.id_grupo)
+                              .map((asignacion) => {
+                                const profesor = profesores.find(
+                                  (item) => item.id_profesor === asignacion.id_profesor
+                                );
+
+                                return profesor
+                                  ? `${profesor.nombres} ${profesor.apellidos}`
+                                  : "Profesor no encontrado";
+                              })
+                              .join(", ") || "Sin profesor asignado"}
+                          </p>
                         </div>
                         <div className="flex items-center gap-1">
                           <button
@@ -133,7 +155,11 @@ function CursoTable({
                             title="Editar grupo"
                             className="rounded-md px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
                           >
-                            Editar
+                            <span
+                              aria-hidden="true"
+                              className="block h-5 w-5 bg-yellow-300 [mask-image:url('/icons/pencil-fill.svg')] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain]"
+                            />
+                            {/* Editar Grupo */}
                           </button>
                           <button
                             type="button"
@@ -163,10 +189,25 @@ function CursoTable({
           <div className="flex gap-2 border-t border-gray-100 bg-gray-50 px-6 py-4">
             <button
               type="button"
-              onClick={() => onEditar(curso)}
-              className="flex-1 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+              onClick={() => onAsignarProfesor(curso)}
+              disabled={!grupos.some((grupo) => grupo.id_curso === curso.id_curso)}
+              className="flex-1 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Editar
+              Asignar profesor
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onEditar(curso)}
+              aria-label={`Editar ${curso.nombre_curso}`}
+              title="Editar curso"
+              className="rounded-md p-2 transition hover:bg-gray-100"
+            >
+              <span
+                aria-hidden="true"
+                className="block h-5 w-5 bg-yellow-300 [mask-image:url('/icons/pencil-square.svg')] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain]"
+              />
+              {/* Editar Curso */}
             </button>
 
             <button

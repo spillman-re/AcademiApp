@@ -12,9 +12,18 @@ import {
   actualizarGrupo,
   obtenerGrupos,
 } from "../../services/grupoService";
+import { obtenerProfesores } from "../../services/profesorService";
+import {
+  crearAsignacionProfesor,
+  obtenerAsignaciones,
+} from "../../services/asignacionProfesorService";
+import { obtenerHorariosPorGrupo } from "../../services/horarioService";
 
 import type { Curso } from "../../types/curso";
 import type { Grupo } from "../../types/grupo";
+import type { Profesor } from "../../types/profesor";
+import type { AsignacionProfesor } from "../../types/asignacionProfesor";
+import type { Horario } from "../../types/horario";
 import type { CursoFormData } from "../../schema/cursoSchema";
 import {
   type CrearGrupoFormData,
@@ -26,10 +35,14 @@ import CursoTable from "../../components/cursos/CursoTable";
 import CursoForm from "../../components/cursos/CursoForm";
 import Modal from "../../components/ui/Modal";
 import GrupoForm from "../../components/grupos/GrupoForm";
+import AsignarProfesorForm from "../../components/cursos/AsignarProfesorForm";
 
 function CursosPage() {
   const [cursos, setCursos] = useState<Curso[]>([]);
   const [grupos, setGrupos] = useState<Grupo[]>([]);
+  const [profesores, setProfesores] = useState<Profesor[]>([]);
+  const [asignaciones, setAsignaciones] = useState<AsignacionProfesor[]>([]);
+  const [horarios, setHorarios] = useState<Horario[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -41,6 +54,8 @@ function CursosPage() {
     useState<Curso | undefined>();
   const [grupoSeleccionado, setGrupoSeleccionado] =
     useState<Grupo | undefined>();
+  const [cursoParaProfesor, setCursoParaProfesor] =
+    useState<Curso | undefined>();
 
   useEffect(() => {
     cargarCursos();
@@ -51,13 +66,17 @@ function CursosPage() {
       setLoading(true);
       setError("");
 
-      const [cursosData, gruposData] = await Promise.all([
+      const [cursosData, gruposData, profesoresData, asignacionesData] = await Promise.all([
         obtenerCursos(),
         obtenerGrupos(),
+        obtenerProfesores(),
+        obtenerAsignaciones(),
       ]);
 
       setCursos(cursosData);
       setGrupos(gruposData);
+      setProfesores(profesoresData);
+      setAsignaciones(asignacionesData);
     } catch {
       setError("No se pudieron cargar los cursos");
     } finally {
@@ -93,6 +112,37 @@ function CursosPage() {
   function cerrarModalGrupo() {
     setCursoParaGrupo(undefined);
     setGrupoSeleccionado(undefined);
+  }
+
+  async function abrirModalAsignarProfesor(curso: Curso) {
+    try {
+      setError("");
+      const horariosPorGrupo = await Promise.all(
+        grupos.map((grupo) => obtenerHorariosPorGrupo(grupo.id_grupo))
+      );
+
+      setHorarios(horariosPorGrupo.flat());
+      setCursoParaProfesor(curso);
+    } catch {
+      setError("No se pudieron cargar los profesores disponibles");
+    }
+  }
+
+  function cerrarModalAsignarProfesor() {
+    setCursoParaProfesor(undefined);
+  }
+
+  async function handleAsignarProfesor(idGrupo: number, idProfesor: number) {
+    const nuevaAsignacion = await crearAsignacionProfesor({
+      id_grupo: idGrupo,
+      id_profesor: idProfesor,
+    });
+
+    setAsignaciones((asignacionesActuales) => [
+      ...asignacionesActuales,
+      nuevaAsignacion,
+    ]);
+    cerrarModalAsignarProfesor();
   }
 
   async function handleGuardarCurso(data: CursoFormData) {
@@ -253,8 +303,11 @@ function CursosPage() {
       <CursoTable
         cursos={cursos}
         grupos={grupos}
+        profesores={profesores}
+        asignaciones={asignaciones}
         onEditar={abrirModalEditar}
         onEliminar={handleEliminarCurso}
+        onAsignarProfesor={abrirModalAsignarProfesor}
         onAgregarGrupo={abrirModalGrupo}
         onEditarGrupo={abrirModalEditarGrupo}
         onEliminarGrupo={handleEliminarGrupo}
@@ -284,6 +337,24 @@ function CursosPage() {
         <GrupoForm
           grupo={grupoSeleccionado}
           onSubmit={handleAgregarGrupo}
+        />
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(cursoParaProfesor)}
+        onClose={cerrarModalAsignarProfesor}
+        title={`Asignar profesor${cursoParaProfesor ? `: ${cursoParaProfesor.nombre_curso}` : ""}`}
+      >
+        <AsignarProfesorForm
+          grupos={
+            cursoParaProfesor
+              ? grupos.filter((grupo) => grupo.id_curso === cursoParaProfesor.id_curso)
+              : []
+          }
+          profesores={profesores}
+          asignaciones={asignaciones}
+          horarios={horarios}
+          onSubmit={handleAsignarProfesor}
         />
       </Modal>
     </div>

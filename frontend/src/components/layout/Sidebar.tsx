@@ -1,9 +1,10 @@
 import { NavLink } from "react-router-dom";
-import { LayoutDashboard, GraduationCap, Sparkles } from "lucide-react";
+import { LayoutDashboard, GraduationCap, Sparkles, Users } from "lucide-react";
 
 const links = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
   { to: "/cursos", label: "Cursos", icon: GraduationCap },
+  { to: "/profesores", label: "Profesores", icon: Users },
 ];
 
 function Sidebar() {
