@@ -1,49 +1,32 @@
 import type { Curso } from "../../types/curso";
 import type { Grupo } from "../../types/grupo";
-import type { Profesor } from "../../types/profesor";
-import type { AsignacionProfesor } from "../../types/asignacionProfesor";
 import { useState } from "react";
+import { CheckCircle, Users } from "lucide-react";
 
 
 interface CursoTableProps {
   cursos: Curso[];
   grupos: Grupo[];
-  profesores: Profesor[];
-  asignaciones: AsignacionProfesor[];
   onEditar: (curso: Curso) => void;
   onEliminar: (id: number) => void;
-  onAsignarProfesor: (curso: Curso) => void;
-  onAgregarGrupo: (curso: Curso) => void;
-  onEditarGrupo: (grupo: Grupo) => void;
-  onEliminarGrupo: (id: number) => Promise<void>;
+  onAdministrarGrupos: (curso: Curso) => void;
+  onFinalizarCurso: (curso: Curso) => void;
 }
 
 function CursoTable({
   cursos,
   grupos,
-  profesores,
-  asignaciones,
   onEditar,
   onEliminar,
-  onAsignarProfesor,
-  onAgregarGrupo,
-  onEditarGrupo,
-  onEliminarGrupo,
+  onAdministrarGrupos,
+  onFinalizarCurso,
 }: CursoTableProps) {
    const [cursoAEliminar, setCursoAEliminar] = useState<Curso | null>(null);
-  const [grupoAEliminar, setGrupoAEliminar] = useState<Grupo | null>(null);
 
   function confirmarEliminacion() {
     if (cursoAEliminar) {
       onEliminar(cursoAEliminar.id_curso);
       setCursoAEliminar(null);
-    }
-  }
-
-  async function confirmarEliminacionGrupo() {
-    if (grupoAEliminar) {
-      await onEliminarGrupo(grupoAEliminar.id_grupo);
-      setGrupoAEliminar(null);
     }
   }
 
@@ -64,7 +47,7 @@ function CursoTable({
 
               <span
                 className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
-                  curso.estado === "Activo"
+                  curso.estado.toUpperCase() === "ACTIVO"
                     ? "bg-green-100 text-green-700"
                     : "bg-gray-100 text-gray-600"
                 }`}
@@ -80,9 +63,9 @@ function CursoTable({
               {curso.descripcion}
             </p>
 
-            <div className="mt-5 grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs font-medium uppercase text-gray-400">
+            <div className="mt-5 grid grid-cols-3 gap-2">
+              <div className="min-w-0">
+                <p className="whitespace-nowrap text-[11px] font-medium uppercase text-gray-400">
                   Duración
                 </p>
 
@@ -91,8 +74,8 @@ function CursoTable({
                 </p>
               </div>
 
-              <div>
-                <p className="text-xs font-medium uppercase text-gray-400">
+              <div className="min-w-0">
+                <p className="whitespace-nowrap text-[11px] font-medium uppercase text-gray-400">
                   Precio
                 </p>
 
@@ -100,100 +83,41 @@ function CursoTable({
                   C$ {curso.precio}
                 </p>
               </div>
-            </div>
 
-            <div className="mt-5 border-t border-gray-100 pt-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-medium uppercase text-gray-400">
+              <div className="min-w-0">
+                <p className="whitespace-nowrap text-[11px] font-medium uppercase text-gray-400">
                   Grupos activos
                 </p>
-                <button
-                  type="button"
-                  onClick={() => onAgregarGrupo(curso)}
-                  className="text-xs font-semibold text-blue-700 hover:text-blue-900"
-                >
-                  + Agregar grupo
-                </button>
-              </div>
 
-              {grupos.filter((grupo) => grupo.id_curso === curso.id_curso).length > 0 ? (
-                <ul className="mt-3 space-y-2">
-                  {grupos
-                    .filter((grupo) => grupo.id_curso === curso.id_curso)
-                    .map((grupo) => (
-                      <li
-                        key={grupo.id_grupo}
-                        className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-2 text-sm"
-                      >
-                        <div>
-                          <p className="font-medium text-gray-700">
-                            {grupo.nombre_grupo}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Inicio: {grupo.fecha_inicio.slice(0, 10)}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Profesor: {asignaciones
-                              .filter((asignacion) => asignacion.id_grupo === grupo.id_grupo)
-                              .map((asignacion) => {
-                                const profesor = profesores.find(
-                                  (item) => item.id_profesor === asignacion.id_profesor
-                                );
-
-                                return profesor
-                                  ? `${profesor.nombres} ${profesor.apellidos}`
-                                  : "Profesor no encontrado";
-                              })
-                              .join(", ") || "Sin profesor asignado"}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => onEditarGrupo(grupo)}
-                            aria-label={`Editar ${grupo.nombre_grupo}`}
-                            title="Editar grupo"
-                            className="rounded-md px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
-                          >
-                            <span
-                              aria-hidden="true"
-                              className="block h-5 w-5 bg-yellow-300 [mask-image:url('/icons/pencil-fill.svg')] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain]"
-                            />
-                            {/* Editar Grupo */}
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setGrupoAEliminar(grupo)}
-                            aria-label={`Cancelar ${grupo.nombre_grupo}`}
-                            title="Cancelar grupo"
-                            className="rounded-md p-2 text-red-600 transition hover:bg-red-100"
-                          >
-                            <span
-                              aria-hidden="true"
-                              className="block h-4 w-4 bg-red-600 [mask-image:url('/icons/trash3.svg')] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain]"
-                            />
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                </ul>
-              ) : (
-                <p className="mt-2 text-sm text-gray-400">
-                  Aún no hay grupos.
+                <p className="mt-1 text-sm font-semibold text-gray-800">
+                  {grupos.filter(
+                    (grupo) =>
+                      grupo.id_curso === curso.id_curso &&
+                      grupo.estado.toUpperCase() === "ACTIVO"
+                  ).length}
                 </p>
-              )}
+              </div>
             </div>
+
           </div>
 
           {/* Acciones */}
-          <div className="flex gap-2 border-t border-gray-100 bg-gray-50 px-6 py-4">
+          <div className="flex flex-wrap gap-2 border-t border-gray-100 bg-gray-50 px-6 py-4">
             <button
               type="button"
-              onClick={() => onAsignarProfesor(curso)}
-              disabled={!grupos.some((grupo) => grupo.id_curso === curso.id_curso)}
-              className="flex-1 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium text-blue-700 transition hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-50"
+              onClick={() => onAdministrarGrupos(curso)}
+              className="min-w-[170px] flex-1 rounded-md bg-blue-950 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-600/30 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              Asignar profesor
+              <Users className="mr-2 inline h-4 w-4 text-blue-200" /> Administrar grupos
+            </button>
+
+            <button
+              type="button"
+              onClick={() => onFinalizarCurso(curso)}
+              disabled={curso.estado.toUpperCase() !== "ACTIVO" || !grupos.some((grupo) => grupo.id_curso === curso.id_curso && grupo.estado.toUpperCase() === "ACTIVO")}
+              className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700 transition hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-600/30 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <CheckCircle className="mr-2 inline h-4 w-4" /> Finalizar curso
             </button>
 
             <button
@@ -264,36 +188,6 @@ function CursoTable({
         </div>
       )}
 
-      {grupoAEliminar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Cancelar grupo
-            </h3>
-            <p className="mt-2 text-sm text-gray-600">
-              ¿Estás seguro de que deseas cancelar{" "}
-              <span className="font-medium">{grupoAEliminar.nombre_grupo}</span>?
-            </p>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setGrupoAEliminar(null)}
-                className="rounded-md border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={confirmarEliminacionGrupo}
-                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-              >
-                Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
     
   );

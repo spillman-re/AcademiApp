@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Plus, Search } from "lucide-react";
 
 import {
   obtenerCursos,
@@ -11,19 +12,11 @@ import {
   eliminarGrupo as eliminarGrupoApi,
   actualizarGrupo,
   obtenerGrupos,
+  finalizarGrupo,
 } from "../../services/grupoService";
-import { obtenerProfesores } from "../../services/profesorService";
-import {
-  crearAsignacionProfesor,
-  obtenerAsignaciones,
-} from "../../services/asignacionProfesorService";
-import { obtenerHorariosPorGrupo } from "../../services/horarioService";
 
 import type { Curso } from "../../types/curso";
 import type { Grupo } from "../../types/grupo";
-import type { Profesor } from "../../types/profesor";
-import type { AsignacionProfesor } from "../../types/asignacionProfesor";
-import type { Horario } from "../../types/horario";
 import type { CursoFormData } from "../../schema/cursoSchema";
 import {
   type CrearGrupoFormData,
@@ -35,14 +28,13 @@ import CursoTable from "../../components/cursos/CursoTable";
 import CursoForm from "../../components/cursos/CursoForm";
 import Modal from "../../components/ui/Modal";
 import GrupoForm from "../../components/grupos/GrupoForm";
-import AsignarProfesorForm from "../../components/cursos/AsignarProfesorForm";
+import AdministrarGruposModal from "../../components/grupos/AdministrarGruposModal";
 
 function CursosPage() {
   const [cursos, setCursos] = useState<Curso[]>([]);
+  const [busqueda, setBusqueda] = useState("");
+  const [estadoFiltro, setEstadoFiltro] = useState("todos");
   const [grupos, setGrupos] = useState<Grupo[]>([]);
-  const [profesores, setProfesores] = useState<Profesor[]>([]);
-  const [asignaciones, setAsignaciones] = useState<AsignacionProfesor[]>([]);
-  const [horarios, setHorarios] = useState<Horario[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -52,10 +44,11 @@ function CursosPage() {
     useState<Curso | undefined>();
   const [cursoParaGrupo, setCursoParaGrupo] =
     useState<Curso | undefined>();
+  const [cursoParaAdministrar, setCursoParaAdministrar] =
+    useState<Curso | undefined>();
+  const [cursoAFinalizar, setCursoAFinalizar] = useState<Curso | undefined>();
   const [grupoSeleccionado, setGrupoSeleccionado] =
     useState<Grupo | undefined>();
-  const [cursoParaProfesor, setCursoParaProfesor] =
-    useState<Curso | undefined>();
 
   useEffect(() => {
     cargarCursos();
@@ -66,17 +59,13 @@ function CursosPage() {
       setLoading(true);
       setError("");
 
-      const [cursosData, gruposData, profesoresData, asignacionesData] = await Promise.all([
+      const [cursosData, gruposData] = await Promise.all([
         obtenerCursos(),
         obtenerGrupos(),
-        obtenerProfesores(),
-        obtenerAsignaciones(),
       ]);
 
       setCursos(cursosData);
       setGrupos(gruposData);
-      setProfesores(profesoresData);
-      setAsignaciones(asignacionesData);
     } catch {
       setError("No se pudieron cargar los cursos");
     } finally {
@@ -114,36 +103,10 @@ function CursosPage() {
     setGrupoSeleccionado(undefined);
   }
 
-  async function abrirModalAsignarProfesor(curso: Curso) {
-    try {
-      setError("");
-      const horariosPorGrupo = await Promise.all(
-        grupos.map((grupo) => obtenerHorariosPorGrupo(grupo.id_grupo))
-      );
-
-      setHorarios(horariosPorGrupo.flat());
-      setCursoParaProfesor(curso);
-    } catch {
-      setError("No se pudieron cargar los profesores disponibles");
-    }
+  function abrirModalAdministrar(curso: Curso) {
+    setCursoParaAdministrar(curso);
   }
 
-  function cerrarModalAsignarProfesor() {
-    setCursoParaProfesor(undefined);
-  }
-
-  async function handleAsignarProfesor(idGrupo: number, idProfesor: number) {
-    const nuevaAsignacion = await crearAsignacionProfesor({
-      id_grupo: idGrupo,
-      id_profesor: idProfesor,
-    });
-
-    setAsignaciones((asignacionesActuales) => [
-      ...asignacionesActuales,
-      nuevaAsignacion,
-    ]);
-    cerrarModalAsignarProfesor();
-  }
 
   async function handleGuardarCurso(data: CursoFormData) {
     try {
@@ -271,6 +234,77 @@ function CursosPage() {
     }
   }
 
+  async function handleFinalizarGrupo(id: number) {
+    try {
+      setError("");
+      await finalizarGrupo(id);
+      setGrupos((gruposActuales) =>
+        gruposActuales.map((grupo) =>
+          grupo.id_grupo === id ? { ...grupo, estado: "FINALIZADO" } : grupo
+        )
+      );
+      await cargarCursos();
+    } catch (finalizarError) {
+      setError(finalizarError instanceof Error ? finalizarError.message : "No se pudo finalizar el grupo");
+      throw finalizarError;
+    }
+  }
+
+  async function handleFinalizarCurso(curso: Curso) {
+    const gruposActivos = grupos.filter(
+      (grupo) =>
+        grupo.id_curso === curso.id_curso &&
+        grupo.estado.toUpperCase() === "ACTIVO"
+    );
+
+    if (gruposActivos.length === 0) {
+      setError("El curso no tiene grupos activos para finalizar.");
+      return;
+    }
+
+    setCursoAFinalizar(curso);
+  }
+
+  async function confirmarFinalizarCurso() {
+    if (!cursoAFinalizar) return;
+
+    const gruposActivos = grupos.filter(
+      (grupo) =>
+        grupo.id_curso === cursoAFinalizar.id_curso &&
+        grupo.estado.toUpperCase() === "ACTIVO"
+    );
+
+    try {
+      setError("");
+      for (const grupo of gruposActivos) {
+        await finalizarGrupo(grupo.id_grupo);
+      }
+      await cargarCursos();
+      setCursoAFinalizar(undefined);
+    } catch (finalizarError) {
+      setError(finalizarError instanceof Error ? finalizarError.message : "No se pudo finalizar el curso");
+    }
+  }
+
+  const cursosFiltrados = cursos
+    .filter((curso) => {
+      const coincideNombre = curso.nombre_curso
+        .toLowerCase()
+        .includes(busqueda.trim().toLowerCase());
+      const coincideEstado =
+        estadoFiltro === "todos" || curso.estado.toLowerCase() === estadoFiltro;
+
+      return coincideNombre && coincideEstado;
+    })
+    .sort((cursoA, cursoB) => {
+      if (estadoFiltro !== "todos") return 0;
+
+      const esActivoA = cursoA.estado.toUpperCase() === "ACTIVO";
+      const esActivoB = cursoB.estado.toUpperCase() === "ACTIVO";
+
+      return Number(esActivoB) - Number(esActivoA);
+    });
+
   if (loading) {
     return <p>Cargando cursos...</p>;
   }
@@ -286,9 +320,10 @@ function CursosPage() {
         <button
           type="button"
           onClick={abrirModalCrear}
-          className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          className="group flex items-center gap-2 rounded-lg bg-blue-950 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-950/20 transition hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
         >
-          + Nuevo curso
+          <Plus className="h-4 w-4 text-blue-200 transition group-hover:text-white" strokeWidth={2.5} />
+          Nuevo curso
         </button>
       </div>
 
@@ -299,18 +334,44 @@ function CursosPage() {
         </p>
       )}
 
-      {/* Tabla */}
+      <div className="mt-6 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center">
+        <label className="relative block flex-1">
+          <span className="sr-only">Buscar cursos por nombre</span>
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
+          />
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(event) => setBusqueda(event.target.value)}
+            placeholder="Buscar curso por nombre..."
+            className="w-full rounded-md border border-gray-300 py-2.5 pl-10 pr-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+          />
+        </label>
+
+        <label className="flex items-center gap-2 text-sm text-gray-600">
+          <span className="whitespace-nowrap font-medium">Estado</span>
+          <select
+            value={estadoFiltro}
+            onChange={(event) => setEstadoFiltro(event.target.value)}
+            className="rounded-md border border-gray-300 bg-white px-3 py-2.5 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+          >
+            <option value="todos">Todos</option>
+            <option value="activo">Activo</option>
+            <option value="finalizado">Finalizado</option>
+          </select>
+        </label>
+      </div>
+
+      {/* Cursos */}
       <CursoTable
-        cursos={cursos}
+        cursos={cursosFiltrados}
         grupos={grupos}
-        profesores={profesores}
-        asignaciones={asignaciones}
         onEditar={abrirModalEditar}
         onEliminar={handleEliminarCurso}
-        onAsignarProfesor={abrirModalAsignarProfesor}
-        onAgregarGrupo={abrirModalGrupo}
-        onEditarGrupo={abrirModalEditarGrupo}
-        onEliminarGrupo={handleEliminarGrupo}
+        onAdministrarGrupos={abrirModalAdministrar}
+        onFinalizarCurso={handleFinalizarCurso}
       />
 
       {/* Modal */}
@@ -332,6 +393,7 @@ function CursosPage() {
       <Modal
         isOpen={Boolean(cursoParaGrupo)}
         onClose={cerrarModalGrupo}
+        zIndex={60}
         title={`${grupoSeleccionado ? "Editar grupo" : "Nuevo grupo"}${cursoParaGrupo ? `: ${cursoParaGrupo.nombre_curso}` : ""}`}
       >
         <GrupoForm
@@ -341,21 +403,61 @@ function CursosPage() {
       </Modal>
 
       <Modal
-        isOpen={Boolean(cursoParaProfesor)}
-        onClose={cerrarModalAsignarProfesor}
-        title={`Asignar profesor${cursoParaProfesor ? `: ${cursoParaProfesor.nombre_curso}` : ""}`}
+        isOpen={Boolean(cursoParaAdministrar)}
+        onClose={() => setCursoParaAdministrar(undefined)}
+        title="Grupos del curso"
+        headerAction={
+          <button
+            type="button"
+            onClick={() => cursoParaAdministrar && abrirModalGrupo(cursoParaAdministrar)}
+            className="flex shrink-0 items-center gap-1.5 rounded-md bg-blue-950 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-600/30"
+          >
+            <Plus className="h-3.5 w-3.5 text-blue-200" />
+            Agregar grupo
+          </button>
+        }
       >
-        <AsignarProfesorForm
-          grupos={
-            cursoParaProfesor
-              ? grupos.filter((grupo) => grupo.id_curso === cursoParaProfesor.id_curso)
-              : []
-          }
-          profesores={profesores}
-          asignaciones={asignaciones}
-          horarios={horarios}
-          onSubmit={handleAsignarProfesor}
-        />
+        {cursoParaAdministrar && (
+          <AdministrarGruposModal
+            cursoNombre={cursoParaAdministrar.nombre_curso}
+            grupos={grupos.filter((grupo) => grupo.id_curso === cursoParaAdministrar.id_curso)}
+            onEditarGrupo={abrirModalEditarGrupo}
+            onEliminarGrupo={handleEliminarGrupo}
+            onFinalizarGrupo={handleFinalizarGrupo}
+            onClose={() => setCursoParaAdministrar(undefined)}
+          />
+        )}
+      </Modal>
+
+      <Modal
+        isOpen={Boolean(cursoAFinalizar)}
+        onClose={() => setCursoAFinalizar(undefined)}
+        title="Finalizar curso"
+      >
+        <div className="space-y-4">
+          <p className="text-sm leading-6 text-gray-600">
+            ¿Deseas finalizar el curso <strong className="text-gray-900">{cursoAFinalizar?.nombre_curso}</strong>?
+          </p>
+          <p className="text-sm text-gray-500">
+            Esta acción finalizará sus grupos activos y no se puede deshacer.
+          </p>
+          <div className="flex justify-end gap-2">
+            <button
+              type="button"
+              onClick={() => setCursoAFinalizar(undefined)}
+              className="rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
+            >
+              Cancelar
+            </button>
+            <button
+              type="button"
+              onClick={confirmarFinalizarCurso}
+              className="rounded-md border border-green-200 bg-green-50 px-4 py-2 text-sm font-medium text-green-700 hover:bg-green-100"
+            >
+              Finalizar curso
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   );
