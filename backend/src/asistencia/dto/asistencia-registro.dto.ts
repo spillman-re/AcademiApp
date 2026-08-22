@@ -1,17 +1,19 @@
-import { IsIn, IsInt, IsOptional, IsString, MaxLength } from 'class-validator';
+import {
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+} from 'class-validator';
 
-export class CreateAsistenciaDto {
+export class AsistenciaRegistroDto {
   @IsInt()
   id_inscripcion!: number;
-
-  @IsInt()
-  id_sesion!: number;
 
   @IsIn([
     'PRESENTE',
     'AUSENTE',
     'JUSTIFICADO',
-    'SUSPENDIDO_POR_MORA',
   ])
   estado_asistencia!: string;
 

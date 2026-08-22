@@ -10,6 +10,8 @@ import { AsignacionProfesorModule } from './asignacion-profesor/asignacion-profe
 import { InscripcionModule } from './inscripcion/inscripcion.module';
 import { SesionClaseModule } from './sesion-clase/sesion-clase.module';
 import { AsistenciaModule } from './asistencia/asistencia.module';
+import { EvaluacionModule } from './evaluacion/evaluacion.module';
+import { ResultadoEvaluacionModule } from './resultado-evaluacion/resultado-evaluacion.module';
 
 @Module({
   imports: [
@@ -17,7 +19,7 @@ import { AsistenciaModule } from './asistencia/asistencia.module';
       isGlobal: true,
     }),
     DatabaseModule,    
-    CursoModule, GrupoModule, HorarioClaseModule, EstudianteModule, ProfesorModule, AsignacionProfesorModule, InscripcionModule, SesionClaseModule, AsistenciaModule,
+    CursoModule, GrupoModule, HorarioClaseModule, EstudianteModule, ProfesorModule, AsignacionProfesorModule, InscripcionModule, SesionClaseModule, AsistenciaModule, EvaluacionModule, ResultadoEvaluacionModule,
   ]  
 })
 export class AppModule {}

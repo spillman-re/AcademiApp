@@ -4,10 +4,19 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import * as sql from 'mssql';
+
 import { DatabaseService } from 'src/database/database.service';
 
-import { CreateAsistenciaDto } from './dto/create-asistencia.dto';
-import { UpdateAsistenciaDto } from './dto/update-asistencia.dto';
+import { RegistrarAsistenciasDto } from './dto/registrar-asistencias.dto';
+
+export interface AsistenciaRegistrada {
+  id_asistencia: number;
+  id_inscripcion: number;
+  id_sesion: number;
+  estado_asistencia: string;
+  observacion: string | null;
+}
 
 @Injectable()
 export class AsistenciaService {
@@ -31,16 +40,12 @@ export class AsistenciaService {
         s.hora_inicio,
         s.hora_fin
       FROM asistencia a
-
       INNER JOIN inscripcion i
         ON a.id_inscripcion = i.id_inscripcion
-
       INNER JOIN estudiante e
         ON i.id_estudiante = e.id_estudiante
-
       INNER JOIN sesion_clase s
         ON a.id_sesion = s.id_sesion
-
       ORDER BY
         s.fecha_programada,
         s.hora_inicio,
@@ -58,10 +63,7 @@ export class AsistenciaService {
   async getAsistencia(id: number) {
     const pool = this.databaseService.getPool();
 
-    const result = await pool
-      .request()
-      .input('id', id)
-      .query(`
+    const result = await pool.request().input('id', id).query(`
         SELECT
           a.*,
           i.id_estudiante,
@@ -72,16 +74,12 @@ export class AsistenciaService {
           s.hora_inicio,
           s.hora_fin
         FROM asistencia a
-
         INNER JOIN inscripcion i
           ON a.id_inscripcion = i.id_inscripcion
-
         INNER JOIN estudiante e
           ON i.id_estudiante = e.id_estudiante
-
         INNER JOIN sesion_clase s
           ON a.id_sesion = s.id_sesion
-
         WHERE a.id_asistencia = @id;
       `);
 
@@ -95,260 +93,254 @@ export class AsistenciaService {
   }
 
   // ============================================================
-  // CREAR ASISTENCIA
+  // REGISTRAR ASISTENCIAS DE UNA SESIÓN
   // ============================================================
 
-  async createAsistencia(asistencia: CreateAsistenciaDto) {
+  async registrarAsistencias(idSesion: number, data: RegistrarAsistenciasDto) {
     const pool = this.databaseService.getPool();
 
-    // ----------------------------------------------------------
-    // Obtener inscripción
-    // ----------------------------------------------------------
+    // ============================================================
+    // 1. OBTENER SESIÓN
+    // ============================================================
 
-    const inscripcion = await pool
-      .request()
-      .input('id_inscripcion', asistencia.id_inscripcion)
-      .query(`
-        SELECT
-          i.id_inscripcion,
-          i.id_estudiante,
-          i.id_grupo,
-          i.estado_inscripcion,
-          e.nombres,
-          e.apellidos
-        FROM inscripcion i
-
-        INNER JOIN estudiante e
-          ON i.id_estudiante = e.id_estudiante
-
-        WHERE i.id_inscripcion = @id_inscripcion;
-      `);
-
-    if (inscripcion.recordset.length === 0) {
-      throw new NotFoundException(
-        `La inscripción con id ${asistencia.id_inscripcion} no fue encontrada.`,
-      );
-    }
-
-    const inscripcionActual = inscripcion.recordset[0];
-
-    if (inscripcionActual.estado_inscripcion === 'CANCELADA') {
-      throw new BadRequestException(
-        'No se puede registrar asistencia para una inscripción cancelada.',
-      );
-    }
-
-    // ----------------------------------------------------------
-    // Obtener sesión
-    // ----------------------------------------------------------
-
-    const sesion = await pool
-      .request()
-      .input('id_sesion', asistencia.id_sesion)
+    const sesionResult = await pool.request().input('id_sesion', idSesion)
       .query(`
         SELECT
           id_sesion,
           id_grupo,
           fecha_programada,
-          hora_inicio,
-          hora_fin,
           estado_sesion
         FROM sesion_clase
         WHERE id_sesion = @id_sesion;
       `);
 
-    if (sesion.recordset.length === 0) {
+    if (sesionResult.recordset.length === 0) {
       throw new NotFoundException(
-        `La sesión con id ${asistencia.id_sesion} no fue encontrada.`,
+        `La sesión con id ${idSesion} no fue encontrada.`,
       );
     }
 
-    const sesionActual = sesion.recordset[0];
+    const sesion = sesionResult.recordset[0];
 
-    // ----------------------------------------------------------
-    // La inscripción y la sesión deben pertenecer al mismo grupo
-    // ----------------------------------------------------------
+    // ============================================================
+    // 2. VALIDAR ESTADO DE LA SESIÓN
+    // ============================================================
 
-    if (inscripcionActual.id_grupo !== sesionActual.id_grupo) {
+    if (sesion.estado_sesion === 'CANCELADA') {
       throw new BadRequestException(
-        'La inscripción y la sesión no pertenecen al mismo grupo.',
+        'No se pueden registrar asistencias de una sesión cancelada.',
       );
     }
 
-    // ----------------------------------------------------------
-    // Las sesiones canceladas no generan asistencia
-    // ----------------------------------------------------------
-
-    if (sesionActual.estado_sesion === 'CANCELADA') {
+    if (sesion.estado_sesion === 'REALIZADA') {
       throw new BadRequestException(
-        'No se puede registrar asistencia para una sesión cancelada.',
+        'No se pueden registrar asistencias de una sesión ya realizada.',
       );
     }
 
-    // ----------------------------------------------------------
-    // Evitar asistencia duplicada
-    // ----------------------------------------------------------
+    // ============================================================
+    // 3. OBTENER INSCRIPCIONES ACTIVAS DEL GRUPO
+    // ============================================================
 
-    const existente = await pool
+    const inscripcionesResult = await pool
       .request()
-      .input('id_inscripcion', asistencia.id_inscripcion)
-      .input('id_sesion', asistencia.id_sesion)
-      .query(`
-        SELECT id_asistencia
-        FROM asistencia
-        WHERE id_inscripcion = @id_inscripcion
-        AND id_sesion = @id_sesion;
-      `);
-
-    if (existente.recordset.length > 0) {
-      throw new BadRequestException(
-        'Ya existe una asistencia para este estudiante en esta sesión.',
-      );
-    }
-
-    // ----------------------------------------------------------
-    // Validar SUSPENDIDO_POR_MORA
-    // ----------------------------------------------------------
-
-    if (asistencia.estado_asistencia === 'SUSPENDIDO_POR_MORA') {
-      const mora = await this.verificarMora(
-        asistencia.id_inscripcion,
-        sesionActual.fecha_programada,
-      );
-
-      if (!mora) {
-        throw new BadRequestException(
-          'El estudiante no tiene una obligación vencida sin prórroga válida.',
-        );
-      }
-    }
-
-    // ----------------------------------------------------------
-    // Crear asistencia
-    // ----------------------------------------------------------
-
-    const result = await pool
-      .request()
-      .input('id_inscripcion', asistencia.id_inscripcion)
-      .input('id_sesion', asistencia.id_sesion)
-      .input('estado_asistencia', asistencia.estado_asistencia)
-      .input('observacion', asistencia.observacion ?? null)
-      .query(`
-        INSERT INTO asistencia (
-          id_inscripcion,
-          id_sesion,
-          estado_asistencia,
-          observacion
-        )
-        OUTPUT INSERTED.*
-        VALUES (
-          @id_inscripcion,
-          @id_sesion,
-          @estado_asistencia,
-          @observacion
-        );
-      `);
-
-    return result.recordset[0];
-  }
-
-  // ============================================================
-  // ACTUALIZAR ASISTENCIA
-  // ============================================================
-
-  async updateAsistencia(
-    id: number,
-    asistencia: UpdateAsistenciaDto,
-  ) {
-    const pool = this.databaseService.getPool();
-
-    // ----------------------------------------------------------
-    // Obtener asistencia actual
-    // ----------------------------------------------------------
-
-    const existente = await pool
-      .request()
-      .input('id', id)
-      .query(`
+      .input('id_grupo', sesion.id_grupo).query(`
         SELECT
-          a.*,
-          i.id_grupo,
-          s.estado_sesion,
-          s.fecha_programada
-        FROM asistencia a
-
-        INNER JOIN inscripcion i
-          ON a.id_inscripcion = i.id_inscripcion
-
-        INNER JOIN sesion_clase s
-          ON a.id_sesion = s.id_sesion
-
-        WHERE a.id_asistencia = @id;
+          i.id_inscripcion,
+          i.id_estudiante,
+          e.nombres,
+          e.apellidos
+        FROM inscripcion i
+        INNER JOIN estudiante e
+          ON i.id_estudiante = e.id_estudiante
+        WHERE i.id_grupo = @id_grupo
+          AND i.estado_inscripcion = 'ACTIVA'
+        ORDER BY
+          e.apellidos,
+          e.nombres;
       `);
 
-    if (existente.recordset.length === 0) {
-      throw new NotFoundException(
-        `La asistencia con id ${id} no fue encontrada.`,
-      );
-    }
+    const inscripciones = inscripcionesResult.recordset;
 
-    const actual = existente.recordset[0];
+    // ============================================================
+    // 4. VALIDAR QUE EXISTAN INSCRIPCIONES
+    // ============================================================
 
-    // ----------------------------------------------------------
-    // No modificar asistencia de sesión cancelada
-    // ----------------------------------------------------------
-
-    if (actual.estado_sesion === 'CANCELADA') {
+    if (inscripciones.length === 0) {
       throw new BadRequestException(
-        'No se puede modificar la asistencia de una sesión cancelada.',
+        'El grupo no tiene estudiantes con inscripción activa.',
       );
     }
 
-    const nuevoEstado =
-      asistencia.estado_asistencia ??
-      actual.estado_asistencia;
+    // ============================================================
+    // 5. VALIDAR QUE EL DTO NO ESTÉ VACÍO
+    // ============================================================
 
-    const nuevaObservacion =
-      asistencia.observacion !== undefined
-        ? asistencia.observacion
-        : actual.observacion;
-
-    // ----------------------------------------------------------
-    // Validar SUSPENDIDO_POR_MORA
-    // ----------------------------------------------------------
-
-    if (nuevoEstado === 'SUSPENDIDO_POR_MORA') {
-      const mora = await this.verificarMora(
-        actual.id_inscripcion,
-        actual.fecha_programada,
+    if (data.asistencias.length === 0) {
+      throw new BadRequestException(
+        'Debe registrar la asistencia de los estudiantes.',
       );
-
-      if (!mora) {
-        throw new BadRequestException(
-          'El estudiante no tiene una obligación vencida sin prórroga válida.',
-        );
-      }
     }
 
-    // ----------------------------------------------------------
-    // Actualizar
-    // ----------------------------------------------------------
+    // ============================================================
+    // 6. VALIDAR DUPLICADOS EN EL DTO
+    // ============================================================
 
-    const result = await pool
+    const idsRecibidos = data.asistencias.map(
+      (asistencia) => asistencia.id_inscripcion,
+    );
+
+    const idsUnicos = new Set(idsRecibidos);
+
+    if (idsRecibidos.length !== idsUnicos.size) {
+      throw new BadRequestException(
+        'No se puede registrar más de una asistencia para la misma inscripción.',
+      );
+    }
+
+    // ============================================================
+    // 7. VALIDAR QUE TODOS PERTENEZCAN AL GRUPO
+    // ============================================================
+
+    const idsInscritos = new Set(
+      inscripciones.map((inscripcion) => inscripcion.id_inscripcion),
+    );
+
+    const idsNoPertenecientes = idsRecibidos.filter(
+      (id) => !idsInscritos.has(id),
+    );
+
+    if (idsNoPertenecientes.length > 0) {
+      throw new BadRequestException(
+        'Una o más inscripciones no pertenecen a los estudiantes activos del grupo de esta sesión.',
+      );
+    }
+
+    // ============================================================
+    // 8. VALIDAR QUE ESTÉN TODOS LOS INSCRITOS
+    // ============================================================
+
+    if (idsRecibidos.length !== inscripciones.length) {
+      throw new BadRequestException(
+        'Debe registrar la asistencia de todos los estudiantes con inscripción activa en el grupo.',
+      );
+    }
+
+    // ============================================================
+    // 9. COMPROBAR SI YA SE REGISTRARON ASISTENCIAS
+    // ============================================================
+
+    const asistenciasExistentes = await pool
       .request()
-      .input('id', id)
-      .input('estado_asistencia', nuevoEstado)
-      .input('observacion', nuevaObservacion)
-      .query(`
-        UPDATE asistencia
-        SET
-          estado_asistencia = @estado_asistencia,
-          observacion = @observacion
-        OUTPUT INSERTED.*
-        WHERE id_asistencia = @id;
+      .input('id_sesion', idSesion).query(`
+        SELECT COUNT(*) AS total
+        FROM asistencia
+        WHERE id_sesion = @id_sesion;
       `);
 
-    return result.recordset[0];
+    if (asistenciasExistentes.recordset[0].total > 0) {
+      throw new BadRequestException(
+        'Las asistencias de esta sesión ya fueron registradas.',
+      );
+    }
+
+    // ============================================================
+    // 10. INICIAR TRANSACCIÓN
+    // ============================================================
+
+    const transaction = new sql.Transaction(pool);
+
+    await transaction.begin();
+
+    try {
+      const resultados: AsistenciaRegistrada[] = [];
+
+      // ==========================================================
+      // 11. PROCESAR CADA ASISTENCIA
+      // ==========================================================
+
+      for (const asistencia of data.asistencias) {
+        // --------------------------------------------------------
+        // Verificar mora
+        // --------------------------------------------------------
+
+        const tieneMora = await this.verificarMora(
+          asistencia.id_inscripcion,
+          sesion.fecha_programada,
+          transaction,
+        );
+
+        if (
+          asistencia.estado_asistencia === 'SUSPENDIDO_POR_MORA' &&
+          !tieneMora
+        ) {
+          throw new BadRequestException(
+            `La inscripción ${asistencia.id_inscripcion} no tiene mora y no puede marcarse como SUSPENDIDO_POR_MORA.`,
+          );
+        }
+
+        // --------------------------------------------------------
+        // Determinar estado final
+        // --------------------------------------------------------
+
+        const estadoFinal = tieneMora
+          ? 'SUSPENDIDO_POR_MORA'
+          : asistencia.estado_asistencia;
+
+        // --------------------------------------------------------
+        // Insertar asistencia
+        // --------------------------------------------------------
+
+        const request = new sql.Request(transaction);
+
+        request.input('id_inscripcion', asistencia.id_inscripcion);
+
+        request.input('id_sesion', idSesion);
+
+        request.input('estado_asistencia', estadoFinal);
+
+        request.input('observacion', asistencia.observacion ?? null);
+
+        const result = await request.query<AsistenciaRegistrada>(`
+            INSERT INTO asistencia (
+              id_inscripcion,
+              id_sesion,
+              estado_asistencia,
+              observacion
+            )
+            OUTPUT INSERTED.*
+            VALUES (
+              @id_inscripcion,
+              @id_sesion,
+              @estado_asistencia,
+              @observacion
+            );
+          `);
+
+        resultados.push(result.recordset[0]);
+      }
+
+      // ==========================================================
+      // 12. CONFIRMAR TRANSACCIÓN
+      // ==========================================================
+
+      await transaction.commit();
+
+      return {
+        message: 'Las asistencias fueron registradas correctamente.',
+        id_sesion: idSesion,
+        total_registradas: resultados.length,
+        asistencias: resultados,
+      };
+    } catch (error) {
+      // ==========================================================
+      // 13. DESHACER TRANSACCIÓN SI OCURRE UN ERROR
+      // ==========================================================
+
+      await transaction.rollback();
+
+      throw error;
+    }
   }
 
   // ============================================================
@@ -358,35 +350,32 @@ export class AsistenciaService {
   private async verificarMora(
     idInscripcion: number,
     fechaSesion: Date,
+    transaction?: sql.Transaction,
   ): Promise<boolean> {
     const pool = this.databaseService.getPool();
 
-    const result = await pool
-      .request()
+    const request = transaction ? new sql.Request(transaction) : pool.request();
+
+    const result = await request
       .input('id_inscripcion', idInscripcion)
-      .input('fecha_sesion', fechaSesion)
-      .query(`
+      .input('fecha_sesion', fechaSesion).query(`
         SELECT
           o.id_obligacion
-
         FROM obligacion_pago o
-
         WHERE o.id_inscripcion = @id_inscripcion
-
-        AND o.fecha_vencimiento < @fecha_sesion
-
-        AND (
-          SELECT ISNULL(SUM(p.monto_pagado), 0)
-          FROM pago p
-          WHERE p.id_obligacion = o.id_obligacion
-        ) < o.monto
-
-        AND NOT EXISTS (
-          SELECT 1
-          FROM prorroga pr
-          WHERE pr.id_obligacion = o.id_obligacion
-          AND @fecha_sesion BETWEEN pr.fecha_inicio AND pr.fecha_fin
-        );
+          AND o.fecha_vencimiento < @fecha_sesion
+          AND (
+            SELECT ISNULL(SUM(p.monto_pagado), 0)
+            FROM pago p
+            WHERE p.id_obligacion = o.id_obligacion
+          ) < o.monto
+          AND NOT EXISTS (
+            SELECT 1
+            FROM prorroga pr
+            WHERE pr.id_obligacion = o.id_obligacion
+              AND @fecha_sesion BETWEEN
+                  pr.fecha_inicio AND pr.fecha_fin
+          );
       `);
 
     return result.recordset.length > 0;

@@ -270,7 +270,7 @@ CREATE TABLE resultado_evaluacion (
             (
                 estado_resultado = 'CALIFICADO'
                 AND nota IS NOT NULL
-                AND nota >= 0
+                AND nota BETWEEN 0 AND 100
             )
             OR
             (
