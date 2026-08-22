@@ -14,7 +14,7 @@ export class CursoService {
         const result = await pool.request().query(`
             SELECT *
             FROM curso
-            WHERE estado = 'ACTIVO'
+            WHERE estado IN ('ACTIVO', 'FINALIZADO')
         `);
 
         return result.recordset;
