@@ -1,6 +1,7 @@
 import type { Curso } from "../../types/curso";
 import type { Grupo } from "../../types/grupo";
 import { useState } from "react";
+import { Pencil, Trash2, Users } from "lucide-react";
 
 
 interface CursoTableProps {
@@ -8,9 +9,7 @@ interface CursoTableProps {
   grupos: Grupo[];
   onEditar: (curso: Curso) => void;
   onEliminar: (id: number) => void;
-  onAgregarGrupo: (curso: Curso) => void;
-  onEditarGrupo: (grupo: Grupo) => void;
-  onEliminarGrupo: (id: number) => Promise<void>;
+  onAdministrarGrupos: (curso: Curso) => void;
 }
 
 function CursoTable({
@@ -18,24 +17,14 @@ function CursoTable({
   grupos,
   onEditar,
   onEliminar,
-  onAgregarGrupo,
-  onEditarGrupo,
-  onEliminarGrupo,
+  onAdministrarGrupos,
 }: CursoTableProps) {
    const [cursoAEliminar, setCursoAEliminar] = useState<Curso | null>(null);
-  const [grupoAEliminar, setGrupoAEliminar] = useState<Grupo | null>(null);
 
   function confirmarEliminacion() {
     if (cursoAEliminar) {
       onEliminar(cursoAEliminar.id_curso);
       setCursoAEliminar(null);
-    }
-  }
-
-  async function confirmarEliminacionGrupo() {
-    if (grupoAEliminar) {
-      await onEliminarGrupo(grupoAEliminar.id_grupo);
-      setGrupoAEliminar(null);
     }
   }
 
@@ -56,7 +45,7 @@ function CursoTable({
 
               <span
                 className={`shrink-0 rounded-full px-3 py-1 text-xs font-medium ${
-                  curso.estado === "Activo"
+                  curso.estado.toUpperCase() === "ACTIVO"
                     ? "bg-green-100 text-green-700"
                     : "bg-gray-100 text-gray-600"
                 }`}
@@ -72,9 +61,9 @@ function CursoTable({
               {curso.descripcion}
             </p>
 
-            <div className="mt-5 grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-xs font-medium uppercase text-gray-400">
+            <div className="mt-5 grid grid-cols-3 gap-2">
+              <div className="min-w-0">
+                <p className="whitespace-nowrap text-[11px] font-medium uppercase text-gray-400">
                   Duración
                 </p>
 
@@ -83,8 +72,8 @@ function CursoTable({
                 </p>
               </div>
 
-              <div>
-                <p className="text-xs font-medium uppercase text-gray-400">
+              <div className="min-w-0">
+                <p className="whitespace-nowrap text-[11px] font-medium uppercase text-gray-400">
                   Precio
                 </p>
 
@@ -92,81 +81,44 @@ function CursoTable({
                   C$ {curso.precio}
                 </p>
               </div>
-            </div>
 
-            <div className="mt-5 border-t border-gray-100 pt-4">
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-xs font-medium uppercase text-gray-400">
+              <div className="min-w-0">
+                <p className="whitespace-nowrap text-[11px] font-medium uppercase text-gray-400">
                   Grupos activos
                 </p>
-                <button
-                  type="button"
-                  onClick={() => onAgregarGrupo(curso)}
-                  className="text-xs font-semibold text-blue-700 hover:text-blue-900"
-                >
-                  + Agregar grupo
-                </button>
-              </div>
 
-              {grupos.filter((grupo) => grupo.id_curso === curso.id_curso).length > 0 ? (
-                <ul className="mt-3 space-y-2">
-                  {grupos
-                    .filter((grupo) => grupo.id_curso === curso.id_curso)
-                    .map((grupo) => (
-                      <li
-                        key={grupo.id_grupo}
-                        className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-2 text-sm"
-                      >
-                        <div>
-                          <p className="font-medium text-gray-700">
-                            {grupo.nombre_grupo}
-                          </p>
-                          <p className="text-xs text-gray-500">
-                            Inicio: {grupo.fecha_inicio.slice(0, 10)}
-                          </p>
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button
-                            type="button"
-                            onClick={() => onEditarGrupo(grupo)}
-                            aria-label={`Editar ${grupo.nombre_grupo}`}
-                            title="Editar grupo"
-                            className="rounded-md px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100"
-                          >
-                            Editar
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => setGrupoAEliminar(grupo)}
-                            aria-label={`Cancelar ${grupo.nombre_grupo}`}
-                            title="Cancelar grupo"
-                            className="rounded-md p-2 text-red-600 transition hover:bg-red-100"
-                          >
-                            <span
-                              aria-hidden="true"
-                              className="block h-4 w-4 bg-red-600 [mask-image:url('/icons/trash3.svg')] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain]"
-                            />
-                          </button>
-                        </div>
-                      </li>
-                    ))}
-                </ul>
-              ) : (
-                <p className="mt-2 text-sm text-gray-400">
-                  Aún no hay grupos.
+                <p className="mt-1 text-sm font-semibold text-gray-800">
+                  {grupos.filter(
+                    (grupo) =>
+                      grupo.id_curso === curso.id_curso &&
+                      grupo.estado.toUpperCase() === "ACTIVO"
+                  ).length}
                 </p>
-              )}
+              </div>
             </div>
+
           </div>
 
           {/* Acciones */}
-          <div className="flex gap-2 border-t border-gray-100 bg-gray-50 px-6 py-4">
+          <div className="flex items-center gap-2 border-t border-gray-100 bg-gray-50 px-6 py-4">
+            <button
+              type="button"
+              onClick={() => onAdministrarGrupos(curso)}
+              disabled={curso.estado.trim().toUpperCase() === "FINALIZADO"}
+              className="min-w-0 flex-1 rounded-md bg-blue-950 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-600/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-950"
+            >
+              <Users className="mr-2 inline h-4 w-4 text-blue-200" /> Administrar grupos
+            </button>
+
             <button
               type="button"
               onClick={() => onEditar(curso)}
-              className="flex-1 rounded-md border border-gray-200 bg-white px-3 py-2 text-sm font-medium text-gray-700 transition hover:bg-gray-100"
+              disabled={curso.estado.trim().toUpperCase() === "FINALIZADO"}
+              aria-label={`Editar ${curso.nombre_curso}`}
+              title="Editar curso"
+              className="rounded-md p-2 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
             >
-              Editar
+              <Pencil aria-hidden="true" className="h-5 w-5 text-yellow-500" />
             </button>
 
             <button
@@ -176,10 +128,7 @@ function CursoTable({
               title="Eliminar curso"
               className="rounded-md p-2 text-red-600 transition hover:bg-red-50"
             >
-              <span
-                aria-hidden="true"
-                className="block h-5 w-5 bg-red-600 [mask-image:url('/icons/trash3.svg')] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain]"
-              />
+              <Trash2 aria-hidden="true" className="h-5 w-5" />
             </button>
 
 
@@ -223,36 +172,6 @@ function CursoTable({
         </div>
       )}
 
-      {grupoAEliminar && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-sm rounded-lg bg-white p-6 shadow-lg">
-            <h3 className="text-lg font-semibold text-gray-900">
-              Cancelar grupo
-            </h3>
-            <p className="mt-2 text-sm text-gray-600">
-              ¿Estás seguro de que deseas cancelar{" "}
-              <span className="font-medium">{grupoAEliminar.nombre_grupo}</span>?
-            </p>
-
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setGrupoAEliminar(null)}
-                className="rounded-md border px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                onClick={confirmarEliminacionGrupo}
-                className="rounded-md bg-red-600 px-4 py-2 text-sm font-medium text-white hover:bg-red-700"
-              >
-                Confirmar
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </>
     
   );

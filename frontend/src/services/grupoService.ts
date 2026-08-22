@@ -62,3 +62,13 @@ export async function actualizarGrupo(
 
   return response.json();
 }
+
+export async function finalizarGrupo(id: number): Promise<void> {
+  const response = await fetch(`${API_URL}/${id}/finalizar`, {
+    method: "PATCH",
+  });
+
+  if (!response.ok) {
+    throw new Error("No se pudo finalizar el grupo");
+  }
+}
