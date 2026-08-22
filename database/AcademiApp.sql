@@ -22,11 +22,21 @@ CREATE TABLE curso (
     nombre_curso VARCHAR(150) NOT NULL,
     descripcion VARCHAR(MAX),
     duracion VARCHAR(100),
+
+    -- Precio mensual del curso
     precio NUMERIC(10,2) NOT NULL,
+
+    -- Precio único de matrícula
+    precio_matricula NUMERIC(10,2) NOT NULL DEFAULT 0,
+
     estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVO',
-    
+
     CONSTRAINT chk_curso_precio
         CHECK (precio >= 0),
+
+    CONSTRAINT chk_curso_precio_matricula
+        CHECK (precio_matricula >= 0),
+
     CONSTRAINT chk_curso_estado
         CHECK (estado IN ('ACTIVO', 'FINALIZADO', 'CANCELADO'))
 );
@@ -284,22 +294,59 @@ CREATE TABLE resultado_evaluacion (
 CREATE TABLE obligacion_pago (
     id_obligacion INT IDENTITY(1,1) PRIMARY KEY,
     id_inscripcion INT NOT NULL,
-    numero_cuota INT NOT NULL,
-    periodo VARCHAR(50) NOT NULL,
+
+    tipo_obligacion VARCHAR(20) NOT NULL,
+
+    numero_cuota INT NULL,
+    periodo VARCHAR(50) NULL,
     fecha_vencimiento DATE NOT NULL,
     monto NUMERIC(10,2) NOT NULL,
 
     CONSTRAINT fk_obligacion_inscripcion
         FOREIGN KEY (id_inscripcion)
         REFERENCES inscripcion(id_inscripcion)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
+        ON DELETE NO ACTION,
+
+    CONSTRAINT chk_tipo_obligacion
+        CHECK (
+            tipo_obligacion IN (
+                'MATRICULA',
+                'MENSUALIDAD'
+            )
+        ),
+
     CONSTRAINT chk_monto_obligacion
         CHECK (monto > 0),
+
     CONSTRAINT chk_numero_cuota
-        CHECK (numero_cuota > 0),
+        CHECK (
+            (
+                tipo_obligacion = 'MATRICULA'
+                AND numero_cuota IS NULL
+            )
+            OR
+            (
+                tipo_obligacion = 'MENSUALIDAD'
+                AND numero_cuota IS NOT NULL
+                AND numero_cuota > 0
+            )
+        ),
+
+    CONSTRAINT chk_periodo_obligacion
+    CHECK (
+        (
+            tipo_obligacion = 'MATRICULA'
+            AND periodo IS NULL
+        )
+        OR
+        (
+            tipo_obligacion = 'MENSUALIDAD'
+            AND periodo IS NOT NULL
+        )
+    ),
+
     CONSTRAINT uq_inscripcion_numero_cuota
-        UNIQUE (id_inscripcion, numero_cuota)
+        UNIQUE (id_inscripcion, tipo_obligacion, numero_cuota)
 );
 
 -- 13. PAGO

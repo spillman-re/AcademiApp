@@ -17,7 +17,7 @@ export class GrupoService {
     const result = await pool.request().query(`
             SELECT *
             FROM grupo
-            WHERE estado = 'ACTIVO'
+            WHERE estado IN ('ACTIVO', 'FINALIZADO')
         `);
 
     return result.recordset;
