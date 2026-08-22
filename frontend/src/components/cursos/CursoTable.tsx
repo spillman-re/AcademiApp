@@ -1,7 +1,7 @@
 import type { Curso } from "../../types/curso";
 import type { Grupo } from "../../types/grupo";
 import { useState } from "react";
-import { CheckCircle, Users } from "lucide-react";
+import { Pencil, Trash2, Users } from "lucide-react";
 
 
 interface CursoTableProps {
@@ -10,7 +10,6 @@ interface CursoTableProps {
   onEditar: (curso: Curso) => void;
   onEliminar: (id: number) => void;
   onAdministrarGrupos: (curso: Curso) => void;
-  onFinalizarCurso: (curso: Curso) => void;
 }
 
 function CursoTable({
@@ -19,7 +18,6 @@ function CursoTable({
   onEditar,
   onEliminar,
   onAdministrarGrupos,
-  onFinalizarCurso,
 }: CursoTableProps) {
    const [cursoAEliminar, setCursoAEliminar] = useState<Curso | null>(null);
 
@@ -102,36 +100,25 @@ function CursoTable({
           </div>
 
           {/* Acciones */}
-          <div className="flex flex-wrap gap-2 border-t border-gray-100 bg-gray-50 px-6 py-4">
+          <div className="flex items-center gap-2 border-t border-gray-100 bg-gray-50 px-6 py-4">
             <button
               type="button"
               onClick={() => onAdministrarGrupos(curso)}
-              className="min-w-[170px] flex-1 rounded-md bg-blue-950 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-600/30 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={curso.estado.trim().toUpperCase() === "FINALIZADO"}
+              className="min-w-0 flex-1 rounded-md bg-blue-950 px-3 py-2 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-600/30 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-blue-950"
             >
               <Users className="mr-2 inline h-4 w-4 text-blue-200" /> Administrar grupos
             </button>
 
             <button
               type="button"
-              onClick={() => onFinalizarCurso(curso)}
-              disabled={curso.estado.toUpperCase() !== "ACTIVO" || !grupos.some((grupo) => grupo.id_curso === curso.id_curso && grupo.estado.toUpperCase() === "ACTIVO")}
-              className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-700 transition hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-600/30 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              <CheckCircle className="mr-2 inline h-4 w-4" /> Finalizar curso
-            </button>
-
-            <button
-              type="button"
               onClick={() => onEditar(curso)}
+              disabled={curso.estado.trim().toUpperCase() === "FINALIZADO"}
               aria-label={`Editar ${curso.nombre_curso}`}
               title="Editar curso"
-              className="rounded-md p-2 transition hover:bg-gray-100"
+              className="rounded-md p-2 transition hover:bg-gray-100 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent"
             >
-              <span
-                aria-hidden="true"
-                className="block h-5 w-5 bg-yellow-300 [mask-image:url('/icons/pencil-square.svg')] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain]"
-              />
-              {/* Editar Curso */}
+              <Pencil aria-hidden="true" className="h-5 w-5 text-yellow-500" />
             </button>
 
             <button
@@ -141,10 +128,7 @@ function CursoTable({
               title="Eliminar curso"
               className="rounded-md p-2 text-red-600 transition hover:bg-red-50"
             >
-              <span
-                aria-hidden="true"
-                className="block h-5 w-5 bg-red-600 [mask-image:url('/icons/trash3.svg')] [mask-position:center] [mask-repeat:no-repeat] [mask-size:contain]"
-              />
+              <Trash2 aria-hidden="true" className="h-5 w-5" />
             </button>
 
 

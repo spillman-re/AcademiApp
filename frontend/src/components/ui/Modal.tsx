@@ -1,3 +1,5 @@
+import { X } from "lucide-react";
+
 interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -40,7 +42,7 @@ function Modal({
             onClick={onClose}
             className="rounded-md px-2 py-1 text-gray-500 hover:bg-gray-100 hover:text-gray-900"
           >
-            ✕
+            <X aria-hidden="true" className="h-5 w-5" />
           </button>
         </div>
 

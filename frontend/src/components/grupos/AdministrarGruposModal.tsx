@@ -15,6 +15,7 @@ import {
 interface AdministrarGruposModalProps {
   cursoNombre: string;
   grupos: Grupo[];
+  onAgregarGrupo: () => void;
   onEditarGrupo: (grupo: Grupo) => void;
   onEliminarGrupo: (id: number) => Promise<void>;
   onFinalizarGrupo: (id: number) => Promise<void>;
@@ -48,6 +49,7 @@ function formatearHora(hora: unknown) {
 function AdministrarGruposModal({
   cursoNombre,
   grupos,
+  onAgregarGrupo,
   onEditarGrupo,
   onEliminarGrupo,
   onFinalizarGrupo,
@@ -142,9 +144,19 @@ function AdministrarGruposModal({
 
   return (
     <div className="space-y-5">
-      <div className="border-b border-gray-100 pb-3">
-        <p className="text-xs uppercase tracking-wide text-gray-400">Curso</p>
-        <p className="font-semibold text-gray-900">{cursoNombre}</p>
+      <div className="flex items-end justify-between gap-4 border-b border-gray-100 pb-3">
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-wide text-gray-400">Curso</p>
+          <p className="truncate font-semibold text-gray-900">{cursoNombre}</p>
+        </div>
+        <button
+          type="button"
+          onClick={onAgregarGrupo}
+          className="flex shrink-0 items-center gap-1.5 rounded-md bg-blue-950 px-3 py-2 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-600/30"
+        >
+          <Plus className="h-3.5 w-3.5 text-blue-200" />
+          Agregar grupo
+        </button>
       </div>
 
       {error && <p className="text-sm text-red-600">{error}</p>}
@@ -153,7 +165,7 @@ function AdministrarGruposModal({
         {grupos.length === 0 ? (
           <p className="rounded-md bg-gray-50 p-4 text-sm text-gray-500">Este curso todavía no tiene grupos.</p>
         ) : grupos.map((grupo) => (
-          <section key={grupo.id_grupo} className="rounded-lg border border-gray-200 p-4">
+          <section key={grupo.id_grupo} className="rounded-lg border border-gray-200 bg-gray-50 p-4 shadow-md shadow-gray-900/5">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="font-semibold text-gray-900">{grupo.nombre_grupo}</h3>
@@ -171,10 +183,10 @@ function AdministrarGruposModal({
               </div>
               <div className="mt-2 space-y-2">
                 {(horarios[grupo.id_grupo] ?? []).map((horario) => (
-                  <div key={horario.id_horario} className="flex items-center justify-between rounded-md bg-gray-50 px-3 py-2 text-sm">
+                  <div key={horario.id_horario} className="flex items-center justify-between rounded-md bg-white px-3 py-2 text-sm">
                     <span>{formatearDia(horario.dia_semana)} {formatearHora(horario.hora_inicio)} - {formatearHora(horario.hora_fin)}</span>
                     <span className="flex items-center gap-1">
-                      <button type="button" onClick={() => abrirEditarHorario(grupo, horario)} aria-label="Editar horario" title="Editar horario" className="rounded p-1 text-blue-700 hover:bg-blue-100"><Pencil className="h-4 w-4" /></button>
+                      <button type="button" onClick={() => abrirEditarHorario(grupo, horario)} aria-label="Editar horario" title="Editar horario" className="rounded p-1 text-yellow-500 hover:bg-yellow-100"><Pencil className="h-4 w-4" /></button>
                       <button type="button" onClick={() => setHorarioAEliminar(horario)} aria-label="Eliminar horario" title="Eliminar horario" className="rounded p-1 text-red-600 hover:bg-red-100"><Trash2 className="h-4 w-4" /></button>
                     </span>
                   </div>

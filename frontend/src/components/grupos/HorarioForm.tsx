@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { Plus, Save } from "lucide-react";
 
 import type { Horario } from "../../types/horario";
 
@@ -203,9 +204,16 @@ function HorarioForm({ horario, onSubmit }: HorarioFormProps) {
       <button
         type="submit"
         disabled={guardando}
-        className="rounded-md bg-blue-700 px-4 py-2 text-sm font-medium text-white hover:bg-blue-800 disabled:opacity-50"
+        className="flex items-center gap-2 rounded-lg bg-blue-950 px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-600/30 disabled:cursor-not-allowed disabled:opacity-60"
       >
-        {guardando ? "Guardando..." : horario ? "Guardar cambios" : "Agregar horario"}
+        {guardando ? (
+          "Guardando..."
+        ) : (
+          <>
+            {horario ? <Save className="h-4 w-4" /> : <Plus className="h-4 w-4" />}
+            {horario ? "Guardar cambios" : "Agregar horario"}
+          </>
+        )}
       </button>
     </form>
   );
