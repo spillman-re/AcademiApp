@@ -9,6 +9,7 @@ import { ProfesorModule } from './profesor/profesor.module';
 import { AsignacionProfesorModule } from './asignacion-profesor/asignacion-profesor.module';
 import { InscripcionModule } from './inscripcion/inscripcion.module';
 import { SesionClaseModule } from './sesion-clase/sesion-clase.module';
+import { AsistenciaModule } from './asistencia/asistencia.module';
 
 @Module({
   imports: [
@@ -16,7 +17,7 @@ import { SesionClaseModule } from './sesion-clase/sesion-clase.module';
       isGlobal: true,
     }),
     DatabaseModule,    
-    CursoModule, GrupoModule, HorarioClaseModule, EstudianteModule, ProfesorModule, AsignacionProfesorModule, InscripcionModule, SesionClaseModule,
+    CursoModule, GrupoModule, HorarioClaseModule, EstudianteModule, ProfesorModule, AsignacionProfesorModule, InscripcionModule, SesionClaseModule, AsistenciaModule,
   ]  
 })
 export class AppModule {}
