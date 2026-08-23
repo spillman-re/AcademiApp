@@ -359,24 +359,33 @@ export class AsistenciaService {
     const result = await request
       .input('id_inscripcion', idInscripcion)
       .input('fecha_sesion', fechaSesion).query(`
-        SELECT
-          o.id_obligacion
-        FROM obligacion_pago o
-        WHERE o.id_inscripcion = @id_inscripcion
-          AND o.fecha_vencimiento < @fecha_sesion
-          AND (
-            SELECT ISNULL(SUM(p.monto_pagado), 0)
-            FROM pago p
-            WHERE p.id_obligacion = o.id_obligacion
-          ) < o.monto
-          AND NOT EXISTS (
-            SELECT 1
-            FROM prorroga pr
-            WHERE pr.id_obligacion = o.id_obligacion
-              AND @fecha_sesion BETWEEN
-                  pr.fecha_inicio AND pr.fecha_fin
-          );
-      `);
+      SELECT TOP 1
+        o.id_obligacion
+      FROM obligacion_pago o
+      WHERE o.id_inscripcion = @id_inscripcion
+
+        -- Solo las obligaciones pendientes pueden generar mora
+        AND o.estado = 'PENDIENTE'
+
+        -- La obligación debe estar vencida
+        AND o.fecha_vencimiento < @fecha_sesion
+
+        -- Debe existir saldo pendiente
+        AND (
+          SELECT ISNULL(SUM(p.monto_pagado), 0)
+          FROM pago p
+          WHERE p.id_obligacion = o.id_obligacion
+        ) < o.monto
+
+        -- No debe existir una prórroga vigente
+        AND NOT EXISTS (
+          SELECT 1
+          FROM prorroga pr
+          WHERE pr.id_obligacion = o.id_obligacion
+            AND @fecha_sesion BETWEEN
+                pr.fecha_inicio AND pr.fecha_fin
+        );
+    `);
 
     return result.recordset.length > 0;
   }
