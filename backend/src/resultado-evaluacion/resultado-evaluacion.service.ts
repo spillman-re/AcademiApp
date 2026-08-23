@@ -4,6 +4,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import * as sql from 'mssql';
+
 import { DatabaseService } from 'src/database/database.service';
 
 import { CreateResultadosEvaluacionDto } from './dto/create-resultados-evaluacion.dto';
@@ -91,63 +93,64 @@ export class ResultadoEvaluacionService {
     const pool = this.databaseService.getPool();
 
     // ==========================================================
-    // VERIFICAR EVALUACIÓN + SESIÓN + GRUPO
+    // 1. VERIFICAR EVALUACIÓN + SESIÓN + GRUPO
     // ==========================================================
 
-    const evaluacion = await pool.request().input('id_evaluacion', idEvaluacion)
-      .query(`
-      SELECT
-        e.id_evaluacion,
-        e.id_sesion,
-        s.id_grupo,
-        s.estado_sesion
-      FROM evaluacion e
-      INNER JOIN sesion_clase s
-        ON e.id_sesion = s.id_sesion
-      WHERE e.id_evaluacion = @id_evaluacion;
-    `);
+    const evaluacionResult = await pool
+      .request()
+      .input('id_evaluacion', idEvaluacion).query(`
+        SELECT
+          e.id_evaluacion,
+          e.id_sesion,
+          s.id_grupo,
+          s.estado_sesion
+        FROM evaluacion e
+        INNER JOIN sesion_clase s
+          ON e.id_sesion = s.id_sesion
+        WHERE e.id_evaluacion = @id_evaluacion;
+      `);
 
-    if (evaluacion.recordset.length === 0) {
+    if (evaluacionResult.recordset.length === 0) {
       throw new NotFoundException(
         `La evaluación con id ${idEvaluacion} no fue encontrada.`,
       );
     }
 
-    const evaluacionActual = evaluacion.recordset[0];
+    const evaluacion = evaluacionResult.recordset[0];
 
     // ==========================================================
-    // VALIDAR ESTADO DE LA SESIÓN
+    // 2. VALIDAR ESTADO DE LA SESIÓN
     // ==========================================================
 
-    if (evaluacionActual.estado_sesion === 'CANCELADA') {
+    if (evaluacion.estado_sesion === 'CANCELADA') {
       throw new BadRequestException(
         'No se pueden registrar resultados para una sesión cancelada.',
       );
     }
 
-    if (evaluacionActual.estado_sesion === 'REALIZADA') {
+    if (evaluacion.estado_sesion === 'REALIZADA') {
       throw new BadRequestException(
         'No se pueden registrar nuevos resultados para una sesión que ya fue realizada.',
       );
-    }
+    }    
 
     // ==========================================================
-    // OBTENER ASISTENCIAS DE LA SESIÓN
+    // 4. VERIFICAR ASISTENCIAS DE LA SESIÓN
     // ==========================================================
 
     const asistenciasResult = await pool
       .request()
-      .input('id_sesion', evaluacionActual.id_sesion)
-      .input('id_grupo', evaluacionActual.id_grupo).query(`
-    SELECT
-      a.id_inscripcion,
-      a.estado_asistencia
-    FROM asistencia a
-    INNER JOIN inscripcion i
-      ON a.id_inscripcion = i.id_inscripcion
-    WHERE a.id_sesion = @id_sesion
-      AND i.id_grupo = @id_grupo;
-  `);
+      .input('id_sesion', evaluacion.id_sesion)
+      .input('id_grupo', evaluacion.id_grupo).query(`
+        SELECT
+          a.id_inscripcion,
+          a.estado_asistencia
+        FROM asistencia a
+        INNER JOIN inscripcion i
+          ON a.id_inscripcion = i.id_inscripcion
+        WHERE a.id_sesion = @id_sesion
+          AND i.id_grupo = @id_grupo;
+      `);
 
     const asistencias = asistenciasResult.recordset;
 
@@ -158,15 +161,7 @@ export class ResultadoEvaluacionService {
     }
 
     // ==========================================================
-    // VERIFICAR QUE EXISTAN RESULTADOS ENVIADOS
-    // ==========================================================
-
-    if (!data.resultados || data.resultados.length === 0) {
-      throw new BadRequestException('Debe proporcionar al menos un resultado.');
-    }
-
-    // ==========================================================
-    // VERIFICAR INSCRIPCIONES REPETIDAS
+    // 5. VERIFICAR INSCRIPCIONES REPETIDAS
     // ==========================================================
 
     const idsEnviados = data.resultados.map(
@@ -182,7 +177,7 @@ export class ResultadoEvaluacionService {
     }
 
     // ==========================================================
-    // MAPA DE ASISTENCIAS
+    // 6. MAPA DE ASISTENCIAS
     // ==========================================================
 
     const asistenciaMap = new Map<number, string>();
@@ -195,8 +190,8 @@ export class ResultadoEvaluacionService {
     }
 
     // ==========================================================
-    // VERIFICAR QUE TODAS LAS INSCRIPCIONES ENVIADAS
-    // PERTENEZCAN A LA SESIÓN
+    // 7. VALIDAR QUE LAS INSCRIPCIONES ENVIADAS
+    //    TENGAN ASISTENCIA EN ESTA SESIÓN
     // ==========================================================
 
     for (const resultado of data.resultados) {
@@ -205,14 +200,23 @@ export class ResultadoEvaluacionService {
           `La inscripción ${resultado.id_inscripcion} no tiene asistencia registrada para esta sesión.`,
         );
       }
+
+      const estadoAsistencia = asistenciaMap.get(resultado.id_inscripcion);
+
+      // El frontend solamente debe enviar PRESENTES
+      if (estadoAsistencia !== 'PRESENTE') {
+        throw new BadRequestException(
+          `La inscripción ${resultado.id_inscripcion} no estuvo PRESENTE y no debe enviarse en los resultados.`,
+        );
+      }
     }
 
     // ==========================================================
-    // VERIFICAR QUE TODOS LOS PRESENTES TENGAN RESULTADO
+    // 8. VERIFICAR QUE TODOS LOS PRESENTES TENGAN RESULTADO
     // ==========================================================
 
     const presentes = asistencias.filter(
-      (a) => a.estado_asistencia === 'PRESENTE',
+      (asistencia) => asistencia.estado_asistencia === 'PRESENTE',
     );
 
     const presentesSinResultado = presentes.filter(
@@ -220,7 +224,9 @@ export class ResultadoEvaluacionService {
     );
 
     if (presentesSinResultado.length > 0) {
-      const idsFaltantes = presentesSinResultado.map((a) => a.id_inscripcion);
+      const idsFaltantes = presentesSinResultado.map(
+        (asistencia) => asistencia.id_inscripcion,
+      );
 
       throw new BadRequestException(
         `Debe registrar el resultado de todos los estudiantes presentes. Inscripciones faltantes: ${idsFaltantes.join(', ')}`,
@@ -228,95 +234,19 @@ export class ResultadoEvaluacionService {
     }
 
     // ==========================================================
-    // PROCESAR RESULTADOS
+    // 9. VERIFICAR RESULTADOS PREVIOS
     // ==========================================================
 
-    const resultadosProcesados: {
-      id_inscripcion: number;
-      nota: number | null;
-      estado_resultado: 'CALIFICADO' | 'NO_SE_PRESENTO';
-    }[] = [];
-
-    for (const asistencia of asistencias) {
-      const idInscripcion = asistencia.id_inscripcion;
-      const estadoAsistencia = asistencia.estado_asistencia;
-
-      const resultadoEnviado = data.resultados.find(
-        (resultado) => resultado.id_inscripcion === idInscripcion,
-      );
-
-      // --------------------------------------------------------
-      // PRESENTE
-      // --------------------------------------------------------
-
-      if (estadoAsistencia === 'PRESENTE') {
-        if (!resultadoEnviado) {
-          throw new BadRequestException(
-            `La inscripción ${idInscripcion} estuvo presente y debe tener un resultado.`,
-          );
-        }
-
-        if (
-          resultadoEnviado.nota === undefined ||
-          resultadoEnviado.nota === null
-        ) {
-          throw new BadRequestException(
-            `La inscripción ${idInscripcion} estuvo presente y debe tener una nota.`,
-          );
-        }
-
-        if (resultadoEnviado.nota < 0 || resultadoEnviado.nota > 100) {
-          throw new BadRequestException(
-            `La nota de la inscripción ${idInscripcion} debe estar entre 0 y 100.`,
-          );
-        }
-
-        resultadosProcesados.push({
-          id_inscripcion: idInscripcion,
-          nota: resultadoEnviado.nota,
-          estado_resultado: 'CALIFICADO',
-        });
-
-        continue;
-      }
-
-      // --------------------------------------------------------
-      // AUSENTE / JUSTIFICADO / SUSPENDIDO POR MORA
-      // --------------------------------------------------------
-
-      if (
-        estadoAsistencia === 'AUSENTE' ||
-        estadoAsistencia === 'JUSTIFICADO' ||
-        estadoAsistencia === 'SUSPENDIDO_POR_MORA'
-      ) {
-        resultadosProcesados.push({
-          id_inscripcion: idInscripcion,
-          nota: null,
-          estado_resultado: 'NO_SE_PRESENTO',
-        });
-
-        continue;
-      }
-
-      throw new BadRequestException(
-        `La inscripción ${idInscripcion} tiene un estado de asistencia no válido.`,
-      );
-    }
-
-    // ==========================================================
-    // VERIFICAR RESULTADOS PREVIOS
-    // ==========================================================
-
-    for (const resultado of resultadosProcesados) {
+    for (const resultado of data.resultados) {
       const existente = await pool
         .request()
         .input('id_evaluacion', idEvaluacion)
         .input('id_inscripcion', resultado.id_inscripcion).query(`
-        SELECT id_resultado
-        FROM resultado_evaluacion
-        WHERE id_evaluacion = @id_evaluacion
-          AND id_inscripcion = @id_inscripcion;
-      `);
+          SELECT id_resultado
+          FROM resultado_evaluacion
+          WHERE id_evaluacion = @id_evaluacion
+            AND id_inscripcion = @id_inscripcion;
+        `);
 
       if (existente.recordset.length > 0) {
         throw new BadRequestException(
@@ -326,54 +256,173 @@ export class ResultadoEvaluacionService {
     }
 
     // ==========================================================
-    // CREAR RESULTADOS EN UNA TRANSACCIÓN
+    // 10. INICIAR TRANSACCIÓN
     // ==========================================================
 
-    const transaction = pool.transaction();
-
-    const resultadosCreados: any[] = [];
+    const transaction = new sql.Transaction(pool);
 
     await transaction.begin();
 
     try {
-      for (const resultado of resultadosProcesados) {
-        const request = transaction
-          .request()
+      const resultadosCreados: any[] = [];
+
+      // ========================================================
+      // 11. CREAR RESULTADOS DE LOS PRESENTES
+      // ========================================================
+
+      for (const resultado of data.resultados) {
+        if (resultado.nota === undefined || resultado.nota === null) {
+          throw new BadRequestException(
+            `La inscripción ${resultado.id_inscripcion} estuvo presente y debe tener una nota.`,
+          );
+        }
+
+        if (resultado.nota < 0 || resultado.nota > 100) {
+          throw new BadRequestException(
+            `La nota de la inscripción ${resultado.id_inscripcion} debe estar entre 0 y 100.`,
+          );
+        }
+
+        const request = new sql.Request(transaction);
+
+        request
           .input('id_evaluacion', idEvaluacion)
           .input('id_inscripcion', resultado.id_inscripcion)
           .input('nota', resultado.nota)
-          .input('estado_resultado', resultado.estado_resultado);
+          .input('estado_resultado', 'CALIFICADO');
 
         const result = await request.query(`
-        INSERT INTO resultado_evaluacion (
-          id_evaluacion,
-          id_inscripcion,
-          nota,
-          estado_resultado
-        )
-        OUTPUT INSERTED.*
-        VALUES (
-          @id_evaluacion,
-          @id_inscripcion,
-          @nota,
-          @estado_resultado
-        );
-      `);
+          INSERT INTO resultado_evaluacion (
+            id_evaluacion,
+            id_inscripcion,
+            nota,
+            estado_resultado
+          )
+          OUTPUT INSERTED.*
+          VALUES (
+            @id_evaluacion,
+            @id_inscripcion,
+            @nota,
+            @estado_resultado
+          );
+        `);
 
         resultadosCreados.push(result.recordset[0]);
       }
 
+      // ========================================================
+      // 12. GENERAR AUTOMÁTICAMENTE NO_SE_PRESENTO
+      //     PARA LOS NO PRESENTES
+      // ========================================================
+
+      const noPresentes = asistencias.filter(
+        (asistencia) =>
+          asistencia.estado_asistencia === 'AUSENTE' ||
+          asistencia.estado_asistencia === 'JUSTIFICADO' ||
+          asistencia.estado_asistencia === 'SUSPENDIDO_POR_MORA',
+      );
+
+      for (const asistencia of noPresentes) {
+        const request = new sql.Request(transaction);
+
+        request
+          .input('id_evaluacion', idEvaluacion)
+          .input('id_inscripcion', asistencia.id_inscripcion)
+          .input('nota', null)
+          .input('estado_resultado', 'NO_SE_PRESENTO');
+
+        const result = await request.query(`
+          INSERT INTO resultado_evaluacion (
+            id_evaluacion,
+            id_inscripcion,
+            nota,
+            estado_resultado
+          )
+          OUTPUT INSERTED.*
+          VALUES (
+            @id_evaluacion,
+            @id_inscripcion,
+            @nota,
+            @estado_resultado
+          );
+        `);
+
+        resultadosCreados.push(result.recordset[0]);
+      }
+
+      // ========================================================
+      // 13. VERIFICAR SI TODAS LAS EVALUACIONES DE LA SESIÓN
+      //     YA ESTÁN COMPLETAMENTE PROCESADAS
+      // ========================================================
+
+      const evaluacionesSesion = await new sql.Request(transaction).input(
+        'id_sesion',
+        evaluacion.id_sesion,
+      ).query(`
+        SELECT
+          e.id_evaluacion
+        FROM evaluacion e
+        WHERE e.id_sesion = @id_sesion;
+      `);
+
+      const evaluaciones: { id_evaluacion: number }[] =
+        evaluacionesSesion.recordset;
+
+      const evaluacionesIncompletas: number[] = [];
+
+      let sesionFinalizada = false;
+
+      if (evaluaciones.length > 0) {
+        for (const evaluacionSesion of evaluaciones) {
+          const resultadoEvaluacion = await new sql.Request(transaction).input(
+            'id_evaluacion',
+            evaluacionSesion.id_evaluacion,
+          ).query(`
+            SELECT COUNT(*) AS total
+            FROM resultado_evaluacion
+            WHERE id_evaluacion = @id_evaluacion;
+          `);
+
+          const totalResultados = resultadoEvaluacion.recordset[0].total;
+
+          if (totalResultados < asistencias.length) {
+            evaluacionesIncompletas.push(evaluacionSesion.id_evaluacion);
+          }
+        }
+
+        // Si ninguna evaluación está incompleta,
+        // la sesión puede darse por realizada.
+        if (evaluacionesIncompletas.length === 0) {
+          await new sql.Request(transaction).input(
+            'id_sesion',
+            evaluacion.id_sesion,
+          ).query(`
+              UPDATE sesion_clase
+              SET estado_sesion = 'REALIZADA'
+              WHERE id_sesion = @id_sesion;
+            `);
+
+          sesionFinalizada = true;
+        }
+      }
+
+      // ========================================================
+      // 14. CONFIRMAR TRANSACCIÓN
+      // ========================================================
+
       await transaction.commit();
+
+      return {
+        mensaje: 'Resultados registrados correctamente.',
+        id_evaluacion: idEvaluacion,
+        cantidad: resultadosCreados.length,
+        sesion_finalizada: sesionFinalizada,
+        resultados: resultadosCreados,
+      };
     } catch (error) {
       await transaction.rollback();
       throw error;
     }
-
-    return {
-      mensaje: 'Resultados registrados correctamente.',
-      cantidad: resultadosCreados.length,
-      resultados: resultadosCreados,
-    };
   }
 
   // ============================================================
@@ -383,9 +432,9 @@ export class ResultadoEvaluacionService {
   async updateResultado(id: number, data: UpdateResultadoEvaluacionDto) {
     const pool = this.databaseService.getPool();
 
-    // ----------------------------------------------------------
-    // Obtener resultado actual + evaluación + sesión
-    // ----------------------------------------------------------
+    // ==========================================================
+    // 1. OBTENER RESULTADO + EVALUACIÓN + SESIÓN
+    // ==========================================================
 
     const existente = await pool.request().input('id', id).query(`
         SELECT
@@ -413,9 +462,9 @@ export class ResultadoEvaluacionService {
 
     const actual = existente.recordset[0];
 
-    // ----------------------------------------------------------
-    // No modificar resultados de sesiones canceladas
-    // ----------------------------------------------------------
+    // ==========================================================
+    // 2. VALIDAR ESTADO DE LA SESIÓN
+    // ==========================================================
 
     if (
       actual.estado_sesion === 'CANCELADA' ||
@@ -426,9 +475,9 @@ export class ResultadoEvaluacionService {
       );
     }
 
-    // ----------------------------------------------------------
-    // Verificar inscripción
-    // ----------------------------------------------------------
+    // ==========================================================
+    // 3. VERIFICAR INSCRIPCIÓN
+    // ==========================================================
 
     const inscripcion = await pool
       .request()
@@ -452,9 +501,9 @@ export class ResultadoEvaluacionService {
       );
     }
 
-    // ----------------------------------------------------------
-    // Obtener asistencia actual
-    // ----------------------------------------------------------
+    // ==========================================================
+    // 4. OBTENER ASISTENCIA
+    // ==========================================================
 
     const asistencia = await pool
       .request()
@@ -477,31 +526,20 @@ export class ResultadoEvaluacionService {
     const estadoAsistencia = asistencia.recordset[0].estado_asistencia;
 
     // ==========================================================
-    // LA ASISTENCIA MANDA
+    // 5. LA ASISTENCIA MANDA
     // ==========================================================
 
     let nota: number | null;
-
     let estadoResultado: 'CALIFICADO' | 'NO_SE_PRESENTO';
 
     if (estadoAsistencia === 'PRESENTE') {
-      // --------------------------------------------------------
-      // PRESENTE → CALIFICADO + NOTA
-      // --------------------------------------------------------
-
-      estadoResultado = data.estado_resultado ?? actual.estado_resultado;
+      estadoResultado = 'CALIFICADO';
 
       nota = data.nota !== undefined ? data.nota : actual.nota;
 
-      if (estadoResultado !== 'CALIFICADO') {
-        throw new BadRequestException(
-          'Un estudiante con asistencia PRESENTE debe tener un resultado CALIFICADO.',
-        );
-      }
-
       if (nota === null || nota === undefined) {
         throw new BadRequestException(
-          'Un resultado CALIFICADO debe tener una nota.',
+          'Un estudiante con asistencia PRESENTE debe tener una nota.',
         );
       }
 
@@ -513,10 +551,6 @@ export class ResultadoEvaluacionService {
       estadoAsistencia === 'JUSTIFICADO' ||
       estadoAsistencia === 'SUSPENDIDO_POR_MORA'
     ) {
-      // --------------------------------------------------------
-      // NO PRESENTE → SIEMPRE NO_SE_PRESENTO + NULL
-      // --------------------------------------------------------
-
       estadoResultado = 'NO_SE_PRESENTO';
       nota = null;
     } else {
@@ -524,7 +558,7 @@ export class ResultadoEvaluacionService {
     }
 
     // ==========================================================
-    // ACTUALIZAR
+    // 6. ACTUALIZAR
     // ==========================================================
 
     const result = await pool

@@ -1,14 +1,12 @@
 import {
-  IsEnum,
   IsInt,
   IsNumber,
-  IsOptional,
   Max,
   Min,
 } from 'class-validator';
 
 export class ResultadoEvaluacionItemDto {
-  @IsNumber()
+  @IsInt()
   id_inscripcion!: number;
 
   @IsNumber()
