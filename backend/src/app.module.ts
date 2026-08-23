@@ -14,6 +14,7 @@ import { EvaluacionModule } from './evaluacion/evaluacion.module';
 import { ResultadoEvaluacionModule } from './resultado-evaluacion/resultado-evaluacion.module';
 import { ObligacionPagoModule } from './obligacion-pago/obligacion-pago.module';
 import { PagoModule } from './pago/pago.module';
+import { ProrrogaModule } from './prorroga/prorroga.module';
 
 @Module({
   imports: [
@@ -21,7 +22,7 @@ import { PagoModule } from './pago/pago.module';
       isGlobal: true,
     }),
     DatabaseModule,    
-    CursoModule, GrupoModule, HorarioClaseModule, EstudianteModule, ProfesorModule, AsignacionProfesorModule, InscripcionModule, SesionClaseModule, AsistenciaModule, EvaluacionModule, ResultadoEvaluacionModule, ObligacionPagoModule, PagoModule,
+    CursoModule, GrupoModule, HorarioClaseModule, EstudianteModule, ProfesorModule, AsignacionProfesorModule, InscripcionModule, SesionClaseModule, AsistenciaModule, EvaluacionModule, ResultadoEvaluacionModule, ObligacionPagoModule, PagoModule, ProrrogaModule,
   ]  
 })
 export class AppModule {}

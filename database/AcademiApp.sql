@@ -322,12 +322,12 @@ CREATE TABLE obligacion_pago (
     fecha_vencimiento DATE NOT NULL,
     monto NUMERIC(10,2) NOT NULL,
 
-    estado VARCHAR(20) NOT NULL
+    estado VARCHAR(20) NOT NULL,
     
     CONSTRAINT DF_obligacion_pago_estado DEFAULT 'PENDIENTE',
 
     CONSTRAINT CK_obligacion_pago_estado
-    CHECK (estado IN ('PENDIENTE', 'PAGADA', 'ANULADA'))
+    CHECK (estado IN ('PENDIENTE', 'PAGADA', 'ANULADA')),
 
     CONSTRAINT fk_obligacion_inscripcion
         FOREIGN KEY (id_inscripcion)
