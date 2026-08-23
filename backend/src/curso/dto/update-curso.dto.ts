@@ -17,10 +17,6 @@ export class UpdateCursoDto {
   descripcion?: string;
 
   @IsOptional()
-  @IsString()
-  duracion?: string;
-
-  @IsOptional()
   @IsNumber()
   @Min(0)
   precio?: number;

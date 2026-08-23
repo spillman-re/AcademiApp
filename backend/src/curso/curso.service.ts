@@ -13,7 +13,9 @@ import { UpdateCursoDto } from './dto/update-curso.dto';
 
 @Injectable()
 export class CursoService {
-  constructor(private readonly databaseService: DatabaseService) {}
+  constructor(
+    private readonly databaseService: DatabaseService,
+  ) {}
 
   // ============================================================
   // OBTENER TODOS LOS CURSOS
@@ -73,12 +75,7 @@ export class CursoService {
       .input(
         'descripcion',
         sql.VarChar(sql.Max),
-        curso.descripcion,
-      )
-      .input(
-        'duracion',
-        sql.VarChar(100),
-        curso.duracion,
+        curso.descripcion ?? null,
       )
       .input(
         'precio',
@@ -94,21 +91,16 @@ export class CursoService {
         INSERT INTO curso (
           nombre_curso,
           descripcion,
-          duracion,
           precio,
           precio_matricula
         )
+        OUTPUT INSERTED.*
         VALUES (
           @nombre_curso,
           @descripcion,
-          @duracion,
           @precio,
           @precio_matricula
         );
-
-        SELECT *
-        FROM curso
-        WHERE id_curso = SCOPE_IDENTITY();
       `);
 
     return result.recordset[0];
@@ -129,7 +121,9 @@ export class CursoService {
       .request()
       .input('id', sql.Int, id)
       .query(`
-        SELECT estado
+        SELECT
+          id_curso,
+          estado
         FROM curso
         WHERE id_curso = @id
       `);
@@ -140,9 +134,62 @@ export class CursoService {
       );
     }
 
-    if (existente.recordset[0].estado !== 'ACTIVO') {
+    const cursoActual = existente.recordset[0];
+
+    if (cursoActual.estado !== 'ACTIVO') {
       throw new BadRequestException(
         'No se puede modificar un curso que no está activo.',
+      );
+    }
+
+    // ----------------------------------------------------------
+    // Verificar si existen inscripciones históricas
+    // ----------------------------------------------------------
+    //
+    // IMPORTANTE:
+    // No buscamos únicamente inscripciones ACTIVAS.
+    //
+    // Una vez que existe una inscripción, el precio del curso
+    // debe quedar congelado para proteger el historial financiero.
+    //
+    // Esto evita que:
+    //
+    // 1. Se inscriba un estudiante.
+    // 2. La inscripción termine.
+    // 3. Se cambie posteriormente el precio del curso.
+    //
+    // El precio original debe seguir siendo válido para las
+    // obligaciones generadas durante esa inscripción.
+    // ----------------------------------------------------------
+
+    const inscripciones = await pool
+      .request()
+      .input('id_curso', sql.Int, id)
+      .query(`
+        SELECT TOP 1
+          i.id_inscripcion
+        FROM inscripcion i
+        INNER JOIN grupo g
+          ON i.id_grupo = g.id_grupo
+        WHERE g.id_curso = @id_curso
+      `);
+
+    const tieneInscripciones =
+      inscripciones.recordset.length > 0;
+
+    // ----------------------------------------------------------
+    // No permitir modificar precios si ya existe una inscripción
+    // ----------------------------------------------------------
+
+    if (
+      tieneInscripciones &&
+      (
+        body.precio !== undefined ||
+        body.precio_matricula !== undefined
+      )
+    ) {
+      throw new BadRequestException(
+        'No se puede modificar el precio del curso ni el precio de matrícula porque ya existen inscripciones asociadas al curso.',
       );
     }
 
@@ -151,9 +198,14 @@ export class CursoService {
     // ----------------------------------------------------------
 
     const campos: string[] = [];
+
     const request = pool.request();
 
     request.input('id', sql.Int, id);
+
+    // ----------------------------------------------------------
+    // Nombre
+    // ----------------------------------------------------------
 
     if (body.nombre_curso !== undefined) {
       campos.push('nombre_curso = @nombre_curso');
@@ -165,6 +217,10 @@ export class CursoService {
       );
     }
 
+    // ----------------------------------------------------------
+    // Descripción
+    // ----------------------------------------------------------
+
     if (body.descripcion !== undefined) {
       campos.push('descripcion = @descripcion');
 
@@ -175,15 +231,9 @@ export class CursoService {
       );
     }
 
-    if (body.duracion !== undefined) {
-      campos.push('duracion = @duracion');
-
-      request.input(
-        'duracion',
-        sql.VarChar(100),
-        body.duracion,
-      );
-    }
+    // ----------------------------------------------------------
+    // Precio total del curso
+    // ----------------------------------------------------------
 
     if (body.precio !== undefined) {
       campos.push('precio = @precio');
@@ -195,8 +245,14 @@ export class CursoService {
       );
     }
 
+    // ----------------------------------------------------------
+    // Precio de matrícula
+    // ----------------------------------------------------------
+
     if (body.precio_matricula !== undefined) {
-      campos.push('precio_matricula = @precio_matricula');
+      campos.push(
+        'precio_matricula = @precio_matricula',
+      );
 
       request.input(
         'precio_matricula',
@@ -229,7 +285,7 @@ export class CursoService {
     // Obtener curso actualizado
     // ----------------------------------------------------------
 
-    const result = await pool
+    const actualizado = await pool
       .request()
       .input('id', sql.Int, id)
       .query(`
@@ -238,13 +294,13 @@ export class CursoService {
         WHERE id_curso = @id
       `);
 
-    if (result.recordset.length === 0) {
+    if (actualizado.recordset.length === 0) {
       throw new NotFoundException(
         `El curso con id ${id} no fue encontrado.`,
       );
     }
 
-    return result.recordset[0];
+    return actualizado.recordset[0];
   }
 
   // ============================================================
@@ -258,7 +314,9 @@ export class CursoService {
       .request()
       .input('id', sql.Int, id)
       .query(`
-        SELECT estado
+        SELECT
+          id_curso,
+          estado
         FROM curso
         WHERE id_curso = @id
       `);
@@ -269,7 +327,9 @@ export class CursoService {
       );
     }
 
-    if (existente.recordset[0].estado !== 'ACTIVO') {
+    const curso = existente.recordset[0];
+
+    if (curso.estado !== 'ACTIVO') {
       throw new BadRequestException(
         'No se puede cancelar un curso que no está activo.',
       );

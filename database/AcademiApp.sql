@@ -21,14 +21,10 @@ CREATE TABLE curso (
     id_curso INT IDENTITY(1,1) PRIMARY KEY,
     nombre_curso VARCHAR(150) NOT NULL,
     descripcion VARCHAR(MAX),
-    duracion VARCHAR(100),
-
-    -- Precio mensual del curso
+    -- Precio total del curso
     precio NUMERIC(10,2) NOT NULL,
-
     -- Precio único de matrícula
     precio_matricula NUMERIC(10,2) NOT NULL DEFAULT 0,
-
     estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVO',
 
     CONSTRAINT chk_curso_precio
@@ -38,7 +34,13 @@ CREATE TABLE curso (
         CHECK (precio_matricula >= 0),
 
     CONSTRAINT chk_curso_estado
-        CHECK (estado IN ('ACTIVO', 'FINALIZADO', 'CANCELADO'))
+        CHECK (
+            estado IN (
+                'ACTIVO',
+                'FINALIZADO',
+                'CANCELADO'
+            )
+        )
 );
 
 -- 2. GRUPO
@@ -47,6 +49,11 @@ CREATE TABLE grupo (
     id_curso INT NOT NULL,
     nombre_grupo VARCHAR(100) NOT NULL,
     fecha_inicio DATE NOT NULL,
+    -- Duración del grupo expresada en meses
+    duracion_meses INT NOT NULL,
+    -- Calculada automáticamente a partir de fecha_inicio
+    -- + duracion_meses
+    fecha_fin DATE NOT NULL,
     estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVO',
 
     CONSTRAINT fk_grupo_curso
@@ -54,8 +61,21 @@ CREATE TABLE grupo (
         REFERENCES curso(id_curso)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION,
+
+    CONSTRAINT chk_grupo_duracion
+        CHECK (duracion_meses > 0),
+
+    CONSTRAINT chk_grupo_fecha_fin
+        CHECK (fecha_fin > fecha_inicio),
+
     CONSTRAINT chk_grupo_estado
-        CHECK (estado IN ('ACTIVO', 'FINALIZADO', 'CANCELADO'))
+        CHECK (
+            estado IN (
+                'ACTIVO',
+                'FINALIZADO',
+                'CANCELADO'
+            )
+        )
 );
 
 -- 3. HORARIO_CLASE
@@ -301,6 +321,13 @@ CREATE TABLE obligacion_pago (
     periodo VARCHAR(50) NULL,
     fecha_vencimiento DATE NOT NULL,
     monto NUMERIC(10,2) NOT NULL,
+
+    estado VARCHAR(20) NOT NULL
+    
+    CONSTRAINT DF_obligacion_pago_estado DEFAULT 'PENDIENTE',
+
+    CONSTRAINT CK_obligacion_pago_estado
+    CHECK (estado IN ('PENDIENTE', 'PAGADA', 'ANULADA'))
 
     CONSTRAINT fk_obligacion_inscripcion
         FOREIGN KEY (id_inscripcion)

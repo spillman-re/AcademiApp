@@ -15,10 +15,6 @@ export class CreateCursoDto {
   @IsString()
   descripcion?: string;
 
-  @IsOptional()
-  @IsString()
-  duracion?: string;
-
   @IsNumber()
   @Min(0)
   precio!: number;

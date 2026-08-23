@@ -1,4 +1,13 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Delete,
+  Get,
+  Param,
+  ParseIntPipe,
+  Patch,
+  Post,
+} from '@nestjs/common';
 
 import { InscripcionService } from './inscripcion.service';
 
@@ -17,6 +26,11 @@ export class InscripcionController {
   @Get('/:id')
   getInscripcion(@Param('id') id: string) {
     return this.inscripcionService.getInscripcion(Number(id));
+  }
+
+  @Get('/grupo/:idGrupo')
+  getInscripcionesPorGrupo(@Param('idGrupo', ParseIntPipe) idGrupo: number) {
+    return this.inscripcionService.getInscripcionesPorGrupo(idGrupo);
   }
 
   @Post()
