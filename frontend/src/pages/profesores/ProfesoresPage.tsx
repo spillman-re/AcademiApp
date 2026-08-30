@@ -1,115 +1,241 @@
 import { useEffect, useState } from "react";
+import { Plus, Search } from "lucide-react";
+import { useToast } from "../../context/ToastContext";
 
 import {
-  crearProfesor,
   obtenerProfesores,
+  crearProfesor,
+  actualizarProfesor,
+  eliminarProfesor as eliminarProfesorApi,
 } from "../../services/profesorService";
+import {
+  obtenerAsignaciones,
+  crearAsignacion,
+  eliminarAsignacion,
+} from "../../services/asignacionProfesorService";
+import { obtenerGrupos } from "../../services/grupoService";
+import { obtenerCursos } from "../../services/cursoService";
+
 import type { Profesor } from "../../types/profesor";
+import type { AsignacionProfesor } from "../../types/asignacionProfesor";
+import type { Grupo } from "../../types/grupo";
+import type { Curso } from "../../types/curso";
 import type { ProfesorFormData } from "../../schema/profesorSchema";
-import Modal from "../../components/ui/Modal";
+
+import ProfesorTable from "../../components/profesores/ProfesorTable";
 import ProfesorForm from "../../components/profesores/ProfesorForm";
+import AdministrarAsignacionesModal from "../../components/profesores/AdministrarAsignacionesModal";
+import Modal from "../../components/ui/Modal";
 
 function ProfesoresPage() {
+  const { toast } = useToast();
+
   const [profesores, setProfesores] = useState<Profesor[]>([]);
+  const [asignaciones, setAsignaciones] = useState<AsignacionProfesor[]>([]);
+  const [grupos, setGrupos] = useState<Grupo[]>([]);
+  const [cursos, setCursos] = useState<Curso[]>([]);
+
+  const [busqueda, setBusqueda] = useState("");
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
+
   const [modalAbierto, setModalAbierto] = useState(false);
+  const [profesorSeleccionado, setProfesorSeleccionado] = useState<Profesor | undefined>();
+  const [profesorParaAsignar, setProfesorParaAsignar] = useState<Profesor | undefined>();
 
   useEffect(() => {
-    async function cargarProfesores() {
-      try {
-        setError("");
-        setProfesores(await obtenerProfesores());
-      } catch {
-        setError("No se pudieron cargar los profesores");
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    cargarProfesores();
+    cargarDatos();
   }, []);
 
-  async function handleCrearProfesor(data: ProfesorFormData) {
+  async function cargarDatos() {
     try {
-      setError("");
-      const nuevoProfesor = await crearProfesor(data);
-      setProfesores((profesoresActuales) => [
-        ...profesoresActuales,
-        nuevoProfesor,
+      setLoading(true);
+      const [profesoresData, asignacionesData, gruposData, cursosData] = await Promise.all([
+        obtenerProfesores(),
+        obtenerAsignaciones(),
+        obtenerGrupos(),
+        obtenerCursos(),
       ]);
-      setModalAbierto(false);
+
+      setProfesores(profesoresData);
+      setAsignaciones(asignacionesData);
+      setGrupos(gruposData);
+      setCursos(cursosData);
     } catch {
-      setError("No se pudo crear el profesor");
-      throw new Error("No se pudo crear el profesor");
+      toast.warning("No se pudieron cargar los datos de profesores");
+    } finally {
+      setLoading(false);
     }
+  }
+
+  function abrirModalCrear() {
+    setProfesorSeleccionado(undefined);
+    setModalAbierto(true);
+  }
+
+  function abrirModalEditar(profesor: Profesor) {
+    setProfesorSeleccionado(profesor);
+    setModalAbierto(true);
+  }
+
+  function cerrarModal() {
+    setModalAbierto(false);
+    setProfesorSeleccionado(undefined);
+  }
+
+  async function handleGuardarProfesor(data: ProfesorFormData) {
+    try {
+      if (profesorSeleccionado) {
+        const profesorActualizado = await actualizarProfesor(
+          profesorSeleccionado.id_profesor,
+          data
+        );
+
+        setProfesores((actuales) =>
+          actuales.map((p) =>
+            p.id_profesor === profesorActualizado.id_profesor ? profesorActualizado : p
+          )
+        );
+        toast.info("Profesor actualizado con éxito");
+        cerrarModal();
+        return;
+      }
+
+      const nuevoProfesor = await crearProfesor(data);
+      setProfesores((actuales) => [...actuales, nuevoProfesor]);
+      toast.success("Profesor registrado con éxito");
+      cerrarModal();
+    } catch (err) {
+      toast.warning(
+        err instanceof Error
+          ? err.message
+          : profesorSeleccionado
+          ? "No se pudo actualizar el profesor"
+          : "No se pudo crear el profesor"
+      );
+    }
+  }
+
+  async function handleEliminarProfesor(id: number) {
+    try {
+      await eliminarProfesorApi(id);
+      setProfesores((actuales) => actuales.filter((p) => p.id_profesor !== id));
+      toast.error("Profesor desactivado correctamente");
+    } catch {
+      toast.warning("No se pudo desactivar al profesor");
+    }
+  }
+
+  async function handleAsignarGrupo(id_grupo: number) {
+    if (!profesorParaAsignar) return;
+
+    try {
+      const nuevaAsignacion = await crearAsignacion({
+        id_profesor: profesorParaAsignar.id_profesor,
+        id_grupo,
+      });
+
+      setAsignaciones((actuales) => [...actuales, nuevaAsignacion]);
+      toast.success("Grupo asignado al docente");
+    } catch (err) {
+      toast.warning(err instanceof Error ? err.message : "Error al asignar grupo");
+      throw err;
+    }
+  }
+
+  async function handleEliminarAsignacion(id_asignacion: number) {
+    try {
+      await eliminarAsignacion(id_asignacion);
+      setAsignaciones((actuales) =>
+        actuales.filter((a) => a.id_asignacion !== id_asignacion)
+      );
+      toast.error("Asignación desvinculada correctamente");
+    } catch {
+      toast.warning("No se pudo desvincular la asignación");
+      throw new Error("No se pudo desvincular");
+    }
+  }
+
+  const profesoresFiltrados = profesores.filter((p) => {
+    const termino = busqueda.trim().toLowerCase();
+    const nombreCompleto = `${p.nombres} ${p.apellidos}`.toLowerCase();
+    const especialidad = (p.especialidad || "").toLowerCase();
+
+    return nombreCompleto.includes(termino) || especialidad.includes(termino);
+  });
+
+  if (loading) {
+    return <p className="text-gray-600 text-sm">Cargando profesores...</p>;
   }
 
   return (
     <div>
+      {/* Encabezado */}
       <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900">Profesores</h1>
-          <p className="mt-1 text-sm text-gray-500">
-            Consulta los profesores activos de la academia.
-          </p>
-        </div>
+        <h1 className="text-2xl font-bold text-gray-900">Profesores</h1>
 
         <button
           type="button"
-          onClick={() => setModalAbierto(true)}
-          className="rounded-md bg-black px-4 py-2 text-sm font-medium text-white hover:bg-gray-800"
+          onClick={abrirModalCrear}
+          className="group flex items-center gap-2 rounded-lg bg-blue-950 px-4 py-2.5 text-sm font-semibold text-white shadow-md shadow-blue-950/20 transition hover:bg-blue-900 focus:outline-none focus:ring-2 focus:ring-blue-500/40"
         >
-          + Nuevo profesor
+          <Plus className="h-4 w-4 text-blue-200 transition group-hover:text-white" strokeWidth={2.5} />
+          Nuevo profesor
         </button>
       </div>
 
-      {loading && <p className="mt-6 text-gray-500">Cargando profesores...</p>}
+      {/* Buscador */}
+      <div className="mt-6 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center">
+        <label className="relative block flex-1">
+          <span className="sr-only">Buscar profesor por nombre o especialidad</span>
+          <Search
+            aria-hidden="true"
+            className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-gray-400"
+          />
+          <input
+            type="search"
+            value={busqueda}
+            onChange={(event) => setBusqueda(event.target.value)}
+            placeholder="Buscar por nombre, apellidos o especialidad..."
+            className="w-full rounded-md border border-gray-300 py-2.5 pl-10 pr-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+          />
+        </label>
+      </div>
 
-      {error && <p className="mt-6 text-sm text-red-600">{error}</p>}
+      {/* Lista / Tabla */}
+      <ProfesorTable
+        profesores={profesoresFiltrados}
+        asignaciones={asignaciones}
+        onEditar={abrirModalEditar}
+        onEliminar={handleEliminarProfesor}
+        onAdministrarAsignaciones={(profesor) => setProfesorParaAsignar(profesor)}
+      />
 
-      {!loading && !error && profesores.length === 0 && (
-        <p className="mt-6 rounded-lg border border-dashed border-gray-300 p-8 text-center text-gray-500">
-          No hay profesores activos registrados.
-        </p>
-      )}
-
-      {!loading && !error && profesores.length > 0 && (
-        <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {profesores.map((profesor) => (
-            <article
-              key={profesor.id_profesor}
-              className="rounded-xl border border-gray-200 bg-white p-5 shadow-sm"
-            >
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <h2 className="font-semibold text-gray-900">
-                    {profesor.nombres} {profesor.apellidos}
-                  </h2>
-                  <p className="mt-1 text-sm text-gray-500">
-                    {profesor.especialidad || "Sin especialidad registrada"}
-                  </p>
-                </div>
-
-                <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">
-                  {profesor.estado}
-                </span>
-              </div>
-
-              <p className="mt-5 text-sm text-gray-600">
-                {profesor.telefono || "Sin teléfono registrado"}
-              </p>
-            </article>
-          ))}
-        </div>
-      )}
-
+      {/* Modal Crear / Editar */}
       <Modal
         isOpen={modalAbierto}
-        onClose={() => setModalAbierto(false)}
-        title="Nuevo profesor"
+        onClose={cerrarModal}
+        title={profesorSeleccionado ? "Editar profesor" : "Nuevo profesor"}
       >
-        <ProfesorForm onSubmit={handleCrearProfesor} />
+        <ProfesorForm profesor={profesorSeleccionado} onSubmit={handleGuardarProfesor} />
+      </Modal>
+
+      {/* Modal Administrar Asignaciones */}
+      <Modal
+        isOpen={Boolean(profesorParaAsignar)}
+        onClose={() => setProfesorParaAsignar(undefined)}
+        title={`Asignaciones: ${profesorParaAsignar ? `${profesorParaAsignar.nombres} ${profesorParaAsignar.apellidos}` : ""}`}
+      >
+        {profesorParaAsignar && (
+          <AdministrarAsignacionesModal
+            profesor={profesorParaAsignar}
+            asignaciones={asignaciones}
+            grupos={grupos}
+            cursos={cursos}
+            onAsignarGrupo={handleAsignarGrupo}
+            onEliminarAsignacion={handleEliminarAsignacion}
+            onClose={() => setProfesorParaAsignar(undefined)}
+          />
+        )}
       </Modal>
     </div>
   );

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { Plus, Search } from "lucide-react";
+import { useToast } from "../../context/ToastContext";
 
 import {
   obtenerCursos,
@@ -31,12 +32,13 @@ import GrupoForm from "../../components/grupos/GrupoForm";
 import AdministrarGruposModal from "../../components/grupos/AdministrarGruposModal";
 
 function CursosPage() {
+  const { toast } = useToast();
+
   const [cursos, setCursos] = useState<Curso[]>([]);
   const [busqueda, setBusqueda] = useState("");
   const [estadoFiltro, setEstadoFiltro] = useState("todos");
   const [grupos, setGrupos] = useState<Grupo[]>([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState("");
 
   const [modalAbierto, setModalAbierto] = useState(false);
 
@@ -56,8 +58,6 @@ function CursosPage() {
   async function cargarCursos() {
     try {
       setLoading(true);
-      setError("");
-
       const [cursosData, gruposData] = await Promise.all([
         obtenerCursos(),
         obtenerGrupos(),
@@ -66,7 +66,7 @@ function CursosPage() {
       setCursos(cursosData);
       setGrupos(gruposData);
     } catch {
-      setError("No se pudieron cargar los cursos");
+      toast.warning("No se pudieron cargar los cursos y grupos");
     } finally {
       setLoading(false);
     }
@@ -106,12 +106,8 @@ function CursosPage() {
     setCursoParaAdministrar(curso);
   }
 
-
   async function handleGuardarCurso(data: CursoFormData) {
     try {
-      setError("");
-
-      // EDITAR
       if (cursoSeleccionado) {
         const cursoActualizado = await actualizarCurso(
           cursoSeleccionado.id_curso,
@@ -126,12 +122,11 @@ function CursosPage() {
           )
         );
 
+        toast.info("Curso actualizado con éxito");
         cerrarModal();
-
         return;
       }
 
-      // CREAR
       const nuevoCurso = await crearCurso(data);
 
       setCursos((cursosActuales) => [
@@ -139,9 +134,10 @@ function CursosPage() {
         nuevoCurso,
       ]);
 
+      toast.success("Curso creado con éxito");
       cerrarModal();
     } catch {
-      setError(
+      toast.warning(
         cursoSeleccionado
           ? "No se pudo actualizar el curso"
           : "No se pudo crear el curso"
@@ -151,26 +147,24 @@ function CursosPage() {
 
   async function handleEliminarCurso(id: number) {
     try {
-      setError("");
-
       const cursoActual = cursos.find((curso) => curso.id_curso === id);
 
       if (cursoActual && cursoActual.estado.toUpperCase() === "FINALIZADO") {
         setCursos((cursosActuales) =>
           cursosActuales.filter((curso) => curso.id_curso !== id)
         );
+        toast.error("Curso finalizado removido");
         return;
       }
 
       await eliminarCursoApi(id);
 
       setCursos((cursosActuales) =>
-        cursosActuales.filter(
-          (curso) => curso.id_curso !== id
-        )
+        cursosActuales.filter((curso) => curso.id_curso !== id)
       );
+      toast.error("Curso eliminado correctamente");
     } catch {
-      setError("No se pudo eliminar el curso");
+      toast.warning("No se pudo eliminar el curso");
     }
   }
 
@@ -182,8 +176,6 @@ function CursosPage() {
     }
 
     try {
-      setError("");
-
       const duracionMeses = Number(data.duracion_meses);
 
       if (grupoSeleccionado) {
@@ -207,6 +199,7 @@ function CursosPage() {
               : grupo
           )
         );
+        toast.info("Grupo actualizado con éxito");
       } else {
         if (!esCrearGrupoFormData(data)) {
           return;
@@ -228,39 +221,37 @@ function CursosPage() {
           ...gruposActuales,
           nuevoGrupoConDuracion,
         ]);
+        toast.success("Grupo creado con éxito");
       }
 
       cerrarModalGrupo();
     } catch (error) {
-      setError(
+      toast.warning(
         error instanceof Error
           ? error.message
           : grupoSeleccionado
-            ? "No se pudo actualizar el grupo"
-            : "No se pudo crear el grupo"
+          ? "No se pudo actualizar el grupo"
+          : "No se pudo crear el grupo"
       );
     }
   }
-  
 
   async function handleEliminarGrupo(id: number) {
     try {
-      setError("");
-
       await eliminarGrupoApi(id);
 
       setGrupos((gruposActuales) =>
         gruposActuales.filter((grupo) => grupo.id_grupo !== id)
       );
+      toast.error("Grupo cancelado correctamente");
     } catch {
-      setError("No se pudo cancelar el grupo");
+      toast.warning("No se pudo cancelar el grupo");
       throw new Error("No se pudo cancelar el grupo");
     }
   }
 
   async function handleFinalizarGrupo(id: number) {
     try {
-      setError("");
       await finalizarGrupo(id);
       setGrupos((gruposActuales) =>
         gruposActuales.map((grupo) =>
@@ -268,8 +259,13 @@ function CursosPage() {
         )
       );
       await cargarCursos();
+      toast.info("Grupo finalizado con éxito");
     } catch (finalizarError) {
-      setError(finalizarError instanceof Error ? finalizarError.message : "No se pudo finalizar el grupo");
+      const msg =
+        finalizarError instanceof Error
+          ? finalizarError.message
+          : "No se pudo finalizar el grupo";
+      toast.warning(msg);
       throw finalizarError;
     }
   }
@@ -294,16 +290,14 @@ function CursosPage() {
     });
 
   if (loading) {
-    return <p>Cargando cursos...</p>;
+    return <p className="text-gray-600 text-sm">Cargando cursos...</p>;
   }
 
   return (
     <div>
       {/* Encabezado */}
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">
-          Cursos
-        </h1>
+        <h1 className="text-2xl font-bold text-gray-900">Cursos</h1>
 
         <button
           type="button"
@@ -315,13 +309,7 @@ function CursosPage() {
         </button>
       </div>
 
-      {/* Error */}
-      {error && (
-        <p className="mt-2 text-sm text-red-600">
-          {error}
-        </p>
-      )}
-
+      {/* Buscador y Filtros */}
       <div className="mt-6 flex flex-col gap-3 rounded-xl border border-gray-200 bg-white p-4 shadow-sm sm:flex-row sm:items-center">
         <label className="relative block flex-1">
           <span className="sr-only">Buscar cursos por nombre</span>
@@ -361,15 +349,11 @@ function CursosPage() {
         onAdministrarGrupos={abrirModalAdministrar}
       />
 
-      {/* Modal */}
+      {/* Modal Crear / Editar Curso */}
       <Modal
         isOpen={modalAbierto}
         onClose={cerrarModal}
-        title={
-          cursoSeleccionado
-            ? "Editar curso"
-            : "Nuevo curso"
-        }
+        title={cursoSeleccionado ? "Editar curso" : "Nuevo curso"}
       >
         <CursoForm
           curso={cursoSeleccionado}
@@ -377,6 +361,7 @@ function CursosPage() {
         />
       </Modal>
 
+      {/* Modal Grupo Form */}
       <Modal
         isOpen={Boolean(cursoParaGrupo)}
         onClose={cerrarModalGrupo}
@@ -389,6 +374,7 @@ function CursosPage() {
         />
       </Modal>
 
+      {/* Modal Administrar Grupos */}
       <Modal
         isOpen={Boolean(cursoParaAdministrar)}
         onClose={() => setCursoParaAdministrar(undefined)}
@@ -406,7 +392,6 @@ function CursosPage() {
           />
         )}
       </Modal>
-
     </div>
   );
 }

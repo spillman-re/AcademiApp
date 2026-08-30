@@ -1,9 +1,6 @@
+// src/services/asignacionProfesorService.ts
 import type { AsignacionProfesor } from "../types/asignacionProfesor";
-
-type CrearAsignacionProfesorData = {
-  id_profesor: number;
-  id_grupo: number;
-};
+import type { AsignacionProfesorFormData } from "../schema/asignacionProfesorSchema";
 
 const API_URL = "http://localhost:3000/asignaciones-profesor";
 
@@ -17,20 +14,29 @@ export async function obtenerAsignaciones(): Promise<AsignacionProfesor[]> {
   return response.json();
 }
 
-export async function crearAsignacionProfesor(
-  asignacion: CrearAsignacionProfesorData
+export async function crearAsignacion(
+  data: AsignacionProfesorFormData
 ): Promise<AsignacionProfesor> {
   const response = await fetch(API_URL, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(asignacion),
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(data),
   });
 
   if (!response.ok) {
-    throw new Error("No se pudo asignar el profesor");
+    const err = await response.json().catch(() => null);
+    throw new Error(err?.message || "No se pudo asignar el grupo al profesor");
   }
 
   return response.json();
+}
+
+export async function eliminarAsignacion(id: number): Promise<void> {
+  const response = await fetch(`${API_URL}/${id}`, {
+    method: "DELETE",
+  });
+
+  if (!response.ok) {
+    throw new Error("No se pudo desvincular la asignación");
+  }
 }
