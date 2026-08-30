@@ -1,7 +1,14 @@
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
-import { BookOpen, Clock3, DollarSign, FileText, Plus, Save } from "lucide-react";
+import {
+  BookOpen,
+  DollarSign,
+  FileText,
+  Plus,
+  Save,
+  Wallet,
+} from "lucide-react";
 
 import {
   cursoSchema,
@@ -22,12 +29,12 @@ function CursoForm({ curso, onSubmit }: CursoFormProps) {
     formState: { errors, isSubmitting },
     reset,
   } = useForm<CursoFormData>({
-    resolver: zodResolver(cursoSchema),
+    resolver: zodResolver(cursoSchema) as any,
     defaultValues: {
       nombre_curso: "",
       descripcion: "",
-      duracion: "",
       precio: 0,
+      precio_matricula: 0,
     },
   });
 
@@ -35,8 +42,8 @@ function CursoForm({ curso, onSubmit }: CursoFormProps) {
     reset({
       nombre_curso: curso?.nombre_curso ?? "",
       descripcion: curso?.descripcion ?? "",
-      duracion: curso?.duracion?.toString() ?? "",
       precio: curso?.precio ?? 0,
+      precio_matricula: curso?.precio_matricula ?? 0,
     });
   }, [curso, reset]);
 
@@ -61,7 +68,7 @@ function CursoForm({ curso, onSubmit }: CursoFormProps) {
               Información del curso
             </p>
             <p className="mt-1 text-sm text-blue-200">
-              Completa los datos para agregarlo al catálogo de Academia Silvia.
+              Completa la información comercial del curso y su estructura de pago.
             </p>
           </div>
         </div>
@@ -79,7 +86,9 @@ function CursoForm({ curso, onSubmit }: CursoFormProps) {
             className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15"
           />
           {errors.nombre_curso && (
-            <p className="mt-1.5 text-xs font-medium text-red-600">{errors.nombre_curso.message}</p>
+            <p className="mt-1.5 text-xs font-medium text-red-600">
+              {errors.nombre_curso.message}
+            </p>
           )}
         </div>
 
@@ -95,30 +104,17 @@ function CursoForm({ curso, onSubmit }: CursoFormProps) {
             className="mt-2 w-full resize-none rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15"
           />
           {errors.descripcion && (
-            <p className="mt-1.5 text-xs font-medium text-red-600">{errors.descripcion.message}</p>
+            <p className="mt-1.5 text-xs font-medium text-red-600">
+              {errors.descripcion.message}
+            </p>
           )}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-              <Clock3 className="h-4 w-4 text-blue-700" />
-              Duración
-            </label>
-            <input
-              {...register("duracion")}
-              placeholder="Ej. 3 meses"
-              className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15"
-            />
-            {errors.duracion && (
-              <p className="mt-1.5 text-xs font-medium text-red-600">{errors.duracion.message}</p>
-            )}
-          </div>
-
-          <div>
-            <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
-              <DollarSign className="h-4 w-4 text-blue-700" />
-              Precio
+              <Wallet className="h-4 w-4 text-blue-700" />
+              Precio del curso
             </label>
             <div className="relative mt-2">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500">
@@ -133,7 +129,33 @@ function CursoForm({ curso, onSubmit }: CursoFormProps) {
               />
             </div>
             {errors.precio && (
-              <p className="mt-1.5 text-xs font-medium text-red-600">{errors.precio.message}</p>
+              <p className="mt-1.5 text-xs font-medium text-red-600">
+                {errors.precio.message}
+              </p>
+            )}
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+              <DollarSign className="h-4 w-4 text-blue-700" />
+              Precio de matrícula
+            </label>
+            <div className="relative mt-2">
+              <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500">
+                C$
+              </span>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                {...register("precio_matricula", { valueAsNumber: true })}
+                className="w-full rounded-md border border-gray-300 py-2.5 pl-10 pr-3 text-sm text-gray-900 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15"
+              />
+            </div>
+            {errors.precio_matricula && (
+              <p className="mt-1.5 text-xs font-medium text-red-600">
+                {errors.precio_matricula.message}
+              </p>
             )}
           </div>
         </div>

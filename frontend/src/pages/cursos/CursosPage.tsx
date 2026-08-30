@@ -153,6 +153,15 @@ function CursosPage() {
     try {
       setError("");
 
+      const cursoActual = cursos.find((curso) => curso.id_curso === id);
+
+      if (cursoActual && cursoActual.estado.toUpperCase() === "FINALIZADO") {
+        setCursos((cursosActuales) =>
+          cursosActuales.filter((curso) => curso.id_curso !== id)
+        );
+        return;
+      }
+
       await eliminarCursoApi(id);
 
       setCursos((cursosActuales) =>
@@ -175,18 +184,26 @@ function CursosPage() {
     try {
       setError("");
 
+      const duracionMeses = Number(data.duracion_meses);
+
       if (grupoSeleccionado) {
         const grupoActualizado = await actualizarGrupo(
           grupoSeleccionado.id_grupo,
           {
             nombre_grupo: data.nombre_grupo,
+            duracion_meses: duracionMeses,
           }
         );
 
+        const grupoConDuracion = {
+          ...grupoActualizado,
+          duracion_meses: Number(grupoActualizado.duracion_meses ?? duracionMeses),
+        };
+
         setGrupos((gruposActuales) =>
           gruposActuales.map((grupo) =>
-            grupo.id_grupo === grupoActualizado.id_grupo
-              ? grupoActualizado
+            grupo.id_grupo === grupoConDuracion.id_grupo
+              ? grupoConDuracion
               : grupo
           )
         );
@@ -199,20 +216,28 @@ function CursosPage() {
           id_curso: cursoParaGrupo.id_curso,
           nombre_grupo: data.nombre_grupo,
           fecha_inicio: data.fecha_inicio,
+          duracion_meses: duracionMeses,
         });
+
+        const nuevoGrupoConDuracion = {
+          ...nuevoGrupo,
+          duracion_meses: Number(nuevoGrupo.duracion_meses ?? duracionMeses),
+        };
 
         setGrupos((gruposActuales) => [
           ...gruposActuales,
-          nuevoGrupo,
+          nuevoGrupoConDuracion,
         ]);
       }
 
       cerrarModalGrupo();
-    } catch {
+    } catch (error) {
       setError(
-        grupoSeleccionado
-          ? "No se pudo actualizar el grupo"
-          : "No se pudo crear el grupo"
+        error instanceof Error
+          ? error.message
+          : grupoSeleccionado
+            ? "No se pudo actualizar el grupo"
+            : "No se pudo crear el grupo"
       );
     }
   }

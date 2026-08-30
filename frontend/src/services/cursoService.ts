@@ -3,6 +3,33 @@ import type { CursoFormData } from "../schema/cursoSchema";
 
 const API_URL = "http://localhost:3000/cursos";
 
+function normalizarCurso(
+  curso: Partial<Curso> & {
+    precio?: number;
+    precio_matricula?: number;
+    matricula?: number;
+    mensualidad?: number;
+  }
+): Curso {
+  return {
+    id_curso: curso.id_curso ?? 0,
+    nombre_curso: curso.nombre_curso ?? "",
+    descripcion: curso.descripcion ?? "",
+    precio: Number(curso.precio ?? curso.matricula ?? 0),
+    precio_matricula: Number(curso.precio_matricula ?? curso.mensualidad ?? curso.matricula ?? 0),
+    estado: curso.estado ?? "ACTIVO",
+  };
+}
+
+function mapearPayload(curso: CursoFormData) {
+  return {
+    nombre_curso: curso.nombre_curso,
+    descripcion: curso.descripcion ?? "",
+    precio: Number(curso.precio),
+    precio_matricula: Number(curso.precio_matricula),
+  };
+}
+
 export async function obtenerCursos(): Promise<Curso[]> {
   const response = await fetch(API_URL);
 
@@ -10,7 +37,8 @@ export async function obtenerCursos(): Promise<Curso[]> {
     throw new Error("No se pudieron obtener los cursos");
   }
 
-  return response.json();
+  const data = await response.json();
+  return Array.isArray(data) ? data.map(normalizarCurso) : [];
 }
 
 export async function crearCurso(
@@ -21,14 +49,15 @@ export async function crearCurso(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(curso),
+    body: JSON.stringify(mapearPayload(curso)),
   });
 
   if (!response.ok) {
     throw new Error("No se pudo crear el curso");
   }
 
-  return response.json();
+  const data = await response.json();
+  return normalizarCurso(data);
 }
 
 export async function actualizarCurso(
@@ -40,14 +69,15 @@ export async function actualizarCurso(
     headers: {
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(curso),
+    body: JSON.stringify(mapearPayload(curso)),
   });
 
   if (!response.ok) {
     throw new Error("No se pudo actualizar el curso");
   }
 
-  return response.json();
+  const data = await response.json();
+  return normalizarCurso(data);
 }
 
 export async function eliminarCurso(id: number): Promise<void> {

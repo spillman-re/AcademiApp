@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle, Pencil, Plus, Trash2 } from "lucide-react";
+import { Pencil, Plus, Trash2 } from "lucide-react";
 
 import type { Grupo } from "../../types/grupo";
 import type { Horario } from "../../types/horario";
@@ -170,6 +170,9 @@ function AdministrarGruposModal({
               <div>
                 <h3 className="font-semibold text-gray-900">{grupo.nombre_grupo}</h3>
                 <p className="mt-1 text-sm text-gray-500">Inicio: {grupo.fecha_inicio.slice(0, 10)}</p>
+                <p className="mt-1 text-sm text-gray-500">
+                  Duración: {grupo.duracion_meses ? `${grupo.duracion_meses} meses` : "Sin duración"}
+                </p>
               </div>
               <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">{grupo.estado}</span>
             </div>
@@ -177,8 +180,13 @@ function AdministrarGruposModal({
             <div className="mt-4 border-t border-gray-100 pt-3">
               <div className="flex items-center justify-between">
                 <p className="text-sm font-semibold text-gray-700">Horarios:</p>
-                <button type="button" onClick={() => abrirNuevoHorario(grupo)} className="flex items-center gap-1 text-xs font-semibold text-blue-950 hover:text-blue-800">
-                  <Plus className="h-3.5 w-3.5" /> Agregar horario
+                <button
+                  type="button"
+                  onClick={() => abrirNuevoHorario(grupo)}
+                  className="inline-flex items-center gap-1.5 rounded-md px-2 py-1.5 text-xs font-semibold text-blue-950 transition hover:bg-blue-50"
+                >
+                  <Plus className="h-3.5 w-3.5" />
+                  Agregar horario
                 </button>
               </div>
               <div className="mt-2 space-y-2">
@@ -200,14 +208,32 @@ function AdministrarGruposModal({
               <p className="text-gray-600"><strong className="text-gray-900">0</strong> profesores</p>
             </div>
 
-            <div className="mt-3 flex gap-2">
-              <button type="button" onClick={() => onEditarGrupo(grupo)} className="text-xs font-medium text-blue-950 hover:text-blue-800">Editar grupo</button>
+            <div className="mt-4 flex flex-col gap-2.5 sm:flex-row sm:items-center">
+              <button
+                type="button"
+                onClick={() => onEditarGrupo(grupo)}
+                className="flex-1 rounded-md px-3 py-2.5 text-sm font-semibold text-blue-950 transition hover:bg-blue-50"
+              >
+                Editar grupo
+              </button>
+
               {grupo.estado.toUpperCase() === "ACTIVO" && (
-                <button type="button" onClick={() => setGrupoAFinalizar(grupo)} className="flex items-center gap-1 text-xs font-medium text-green-700 hover:text-green-900">
-                  <CheckCircle className="h-3.5 w-3.5" /> Finalizar grupo
+                <button
+                  type="button"
+                  onClick={() => setGrupoAFinalizar(grupo)}
+                  className="flex-1 rounded-md px-3 py-2.5 text-sm font-semibold text-green-700 transition hover:bg-green-50"
+                >
+                  Finalizar grupo
                 </button>
               )}
-              <button type="button" onClick={() => setGrupoAEliminar(grupo)} className="text-xs font-medium text-red-600 hover:text-red-800">Eliminar grupo</button>
+
+              <button
+                type="button"
+                onClick={() => setGrupoAEliminar(grupo)}
+                className="flex-1 rounded-md px-3 py-2.5 text-sm font-semibold text-red-600 transition hover:bg-red-50"
+              >
+                Eliminar grupo
+              </button>
             </div>
           </section>
         ))}
