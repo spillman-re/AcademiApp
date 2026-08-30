@@ -21,14 +21,26 @@ CREATE TABLE curso (
     id_curso INT IDENTITY(1,1) PRIMARY KEY,
     nombre_curso VARCHAR(150) NOT NULL,
     descripcion VARCHAR(MAX),
-    duracion VARCHAR(100),
+    -- Precio total del curso
     precio NUMERIC(10,2) NOT NULL,
+    -- Precio único de matrícula
+    precio_matricula NUMERIC(10,2) NOT NULL DEFAULT 0,
     estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVO',
-    
+
     CONSTRAINT chk_curso_precio
         CHECK (precio >= 0),
+
+    CONSTRAINT chk_curso_precio_matricula
+        CHECK (precio_matricula >= 0),
+
     CONSTRAINT chk_curso_estado
-        CHECK (estado IN ('ACTIVO', 'FINALIZADO', 'CANCELADO'))
+        CHECK (
+            estado IN (
+                'ACTIVO',
+                'FINALIZADO',
+                'CANCELADO'
+            )
+        )
 );
 
 -- 2. GRUPO
@@ -37,6 +49,11 @@ CREATE TABLE grupo (
     id_curso INT NOT NULL,
     nombre_grupo VARCHAR(100) NOT NULL,
     fecha_inicio DATE NOT NULL,
+    -- Duración del grupo expresada en meses
+    duracion_meses INT NOT NULL,
+    -- Calculada automáticamente a partir de fecha_inicio
+    -- + duracion_meses
+    fecha_fin DATE NOT NULL,
     estado VARCHAR(20) NOT NULL DEFAULT 'ACTIVO',
 
     CONSTRAINT fk_grupo_curso
@@ -44,8 +61,21 @@ CREATE TABLE grupo (
         REFERENCES curso(id_curso)
         ON DELETE NO ACTION
         ON UPDATE NO ACTION,
+
+    CONSTRAINT chk_grupo_duracion
+        CHECK (duracion_meses > 0),
+
+    CONSTRAINT chk_grupo_fecha_fin
+        CHECK (fecha_fin > fecha_inicio),
+
     CONSTRAINT chk_grupo_estado
-        CHECK (estado IN ('ACTIVO', 'FINALIZADO', 'CANCELADO'))
+        CHECK (
+            estado IN (
+                'ACTIVO',
+                'FINALIZADO',
+                'CANCELADO'
+            )
+        )
 );
 
 -- 3. HORARIO_CLASE
@@ -270,7 +300,7 @@ CREATE TABLE resultado_evaluacion (
             (
                 estado_resultado = 'CALIFICADO'
                 AND nota IS NOT NULL
-                AND nota >= 0
+                AND nota BETWEEN 0 AND 100
             )
             OR
             (
@@ -284,22 +314,66 @@ CREATE TABLE resultado_evaluacion (
 CREATE TABLE obligacion_pago (
     id_obligacion INT IDENTITY(1,1) PRIMARY KEY,
     id_inscripcion INT NOT NULL,
-    numero_cuota INT NOT NULL,
-    periodo VARCHAR(50) NOT NULL,
+
+    tipo_obligacion VARCHAR(20) NOT NULL,
+
+    numero_cuota INT NULL,
+    periodo VARCHAR(50) NULL,
     fecha_vencimiento DATE NOT NULL,
     monto NUMERIC(10,2) NOT NULL,
+
+    estado VARCHAR(20) NOT NULL,
+    
+    CONSTRAINT DF_obligacion_pago_estado DEFAULT 'PENDIENTE',
+
+    CONSTRAINT CK_obligacion_pago_estado
+    CHECK (estado IN ('PENDIENTE', 'PAGADA', 'ANULADA')),
 
     CONSTRAINT fk_obligacion_inscripcion
         FOREIGN KEY (id_inscripcion)
         REFERENCES inscripcion(id_inscripcion)
-        ON DELETE NO ACTION
-        ON UPDATE NO ACTION,
+        ON DELETE NO ACTION,
+
+    CONSTRAINT chk_tipo_obligacion
+        CHECK (
+            tipo_obligacion IN (
+                'MATRICULA',
+                'MENSUALIDAD'
+            )
+        ),
+
     CONSTRAINT chk_monto_obligacion
         CHECK (monto > 0),
+
     CONSTRAINT chk_numero_cuota
-        CHECK (numero_cuota > 0),
+        CHECK (
+            (
+                tipo_obligacion = 'MATRICULA'
+                AND numero_cuota IS NULL
+            )
+            OR
+            (
+                tipo_obligacion = 'MENSUALIDAD'
+                AND numero_cuota IS NOT NULL
+                AND numero_cuota > 0
+            )
+        ),
+
+    CONSTRAINT chk_periodo_obligacion
+    CHECK (
+        (
+            tipo_obligacion = 'MATRICULA'
+            AND periodo IS NULL
+        )
+        OR
+        (
+            tipo_obligacion = 'MENSUALIDAD'
+            AND periodo IS NOT NULL
+        )
+    ),
+
     CONSTRAINT uq_inscripcion_numero_cuota
-        UNIQUE (id_inscripcion, numero_cuota)
+        UNIQUE (id_inscripcion, tipo_obligacion, numero_cuota)
 );
 
 -- 13. PAGO

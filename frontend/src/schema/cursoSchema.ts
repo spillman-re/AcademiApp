@@ -1,10 +1,10 @@
 import { z } from "zod";
 
-const precioSchema = z
-  .number({
-    error: "El valor debe ser un número",
-  })
-  .min(0.01, "El valor debe ser mayor a 0");
+const precioSchema = z.coerce
+  .number()
+  .refine((val) => val > 0, {
+    message: "El valor debe ser mayor a 0",
+  });
 
 export const cursoSchema = z.object({
   nombre_curso: z
@@ -14,8 +14,8 @@ export const cursoSchema = z.object({
 
   descripcion: z.string().optional(),
 
-  matricula: precioSchema,
-  mensualidad: precioSchema,
+  precio: precioSchema,
+  precio_matricula: precioSchema,
 });
 
 export type CursoFormData = z.infer<typeof cursoSchema>;

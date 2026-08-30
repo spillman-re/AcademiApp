@@ -3,13 +3,20 @@ import type { CursoFormData } from "../schema/cursoSchema";
 
 const API_URL = "http://localhost:3000/cursos";
 
-function normalizarCurso(curso: Partial<Curso> & { duracion?: string | number; precio?: number }): Curso {
+function normalizarCurso(
+  curso: Partial<Curso> & {
+    precio?: number;
+    precio_matricula?: number;
+    matricula?: number;
+    mensualidad?: number;
+  }
+): Curso {
   return {
     id_curso: curso.id_curso ?? 0,
     nombre_curso: curso.nombre_curso ?? "",
     descripcion: curso.descripcion ?? "",
-    matricula: Number(curso.matricula ?? curso.precio ?? 0),
-    mensualidad: Number(curso.mensualidad ?? curso.precio ?? 0),
+    precio: Number(curso.precio ?? curso.matricula ?? 0),
+    precio_matricula: Number(curso.precio_matricula ?? curso.mensualidad ?? curso.matricula ?? 0),
     estado: curso.estado ?? "ACTIVO",
   };
 }
@@ -18,10 +25,8 @@ function mapearPayload(curso: CursoFormData) {
   return {
     nombre_curso: curso.nombre_curso,
     descripcion: curso.descripcion ?? "",
-    matricula: Number(curso.matricula),
-    mensualidad: Number(curso.mensualidad),
-    precio: Number(curso.matricula),
-    duracion: String(curso.mensualidad),
+    precio: Number(curso.precio),
+    precio_matricula: Number(curso.precio_matricula),
   };
 }
 

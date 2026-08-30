@@ -170,7 +170,9 @@ function AdministrarGruposModal({
               <div>
                 <h3 className="font-semibold text-gray-900">{grupo.nombre_grupo}</h3>
                 <p className="mt-1 text-sm text-gray-500">Inicio: {grupo.fecha_inicio.slice(0, 10)}</p>
-                <p className="mt-1 text-sm text-gray-500">Duración: {grupo.duracion || "Sin duración"}</p>
+                <p className="mt-1 text-sm text-gray-500">
+                  Duración: {grupo.duracion_meses ? `${grupo.duracion_meses} meses` : "Sin duración"}
+                </p>
               </div>
               <span className="rounded-full bg-green-100 px-2.5 py-1 text-xs font-medium text-green-700">{grupo.estado}</span>
             </div>

@@ -31,7 +31,7 @@ function GrupoForm({ grupo, onSubmit }: GrupoFormProps) {
     ),
     defaultValues: {
       nombre_grupo: "",
-      duracion: "",
+      duracion_meses: 1,
       ...(grupo ? {} : { fecha_inicio: "" }),
     },
   });
@@ -39,7 +39,7 @@ function GrupoForm({ grupo, onSubmit }: GrupoFormProps) {
   useEffect(() => {
     reset({
       nombre_grupo: grupo?.nombre_grupo ?? "",
-      duracion: grupo?.duracion ?? "",
+      duracion_meses: grupo?.duracion_meses ?? 1,
       ...(grupo ? {} : { fecha_inicio: "" }),
     });
   }, [grupo, reset]);
@@ -91,18 +91,21 @@ function GrupoForm({ grupo, onSubmit }: GrupoFormProps) {
         <div>
           <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
             <Clock3 className="h-4 w-4 text-blue-700" />
-            Duración del grupo
+            Duración del grupo (meses)
           </label>
 
           <input
-            {...register("duracion")}
-            placeholder="Ej. 3 meses"
+            type="number"
+            min="1"
+            step="1"
+            {...register("duracion_meses", { valueAsNumber: true })}
+            placeholder="Ej. 3"
             className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15"
           />
 
-          {"duracion" in errors && errors.duracion && (
+          {"duracion_meses" in errors && errors.duracion_meses && (
             <p className="mt-1.5 text-xs font-medium text-red-600">
-              {errors.duracion.message}
+              {errors.duracion_meses.message}
             </p>
           )}
         </div>

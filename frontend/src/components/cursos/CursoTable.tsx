@@ -61,19 +61,19 @@ function CursoTable({
               <div className="mt-5 grid grid-cols-2 gap-3">
                 <div className="rounded-xl border border-blue-100 bg-blue-50 p-3">
                   <p className="text-sm font-semibold text-blue-700">
-                    Matrícula
+                    Precio del curso
                   </p>
                   <p className="mt-2 text-base font-semibold text-slate-900">
-                    C$ {curso.matricula}
+                    C$ {curso.precio}
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
                   <p className="text-sm font-semibold text-emerald-700">
-                    Mensualidad
+                    Precio de matrícula
                   </p>
                   <p className="mt-2 text-base font-semibold text-slate-900">
-                    C$ {curso.mensualidad}
+                    C$ {curso.precio_matricula}
                   </p>
                 </div>
               </div>

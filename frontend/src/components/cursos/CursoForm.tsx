@@ -29,12 +29,12 @@ function CursoForm({ curso, onSubmit }: CursoFormProps) {
     formState: { errors, isSubmitting },
     reset,
   } = useForm<CursoFormData>({
-    resolver: zodResolver(cursoSchema),
+    resolver: zodResolver(cursoSchema) as any,
     defaultValues: {
       nombre_curso: "",
       descripcion: "",
-      matricula: undefined as unknown as number,
-      mensualidad: undefined as unknown as number,
+      precio: 0,
+      precio_matricula: 0,
     },
   });
 
@@ -42,8 +42,8 @@ function CursoForm({ curso, onSubmit }: CursoFormProps) {
     reset({
       nombre_curso: curso?.nombre_curso ?? "",
       descripcion: curso?.descripcion ?? "",
-      matricula: curso?.matricula ?? (undefined as unknown as number),
-      mensualidad: curso?.mensualidad ?? (undefined as unknown as number),
+      precio: curso?.precio ?? 0,
+      precio_matricula: curso?.precio_matricula ?? 0,
     });
   }, [curso, reset]);
 
@@ -114,7 +114,7 @@ function CursoForm({ curso, onSubmit }: CursoFormProps) {
           <div>
             <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
               <Wallet className="h-4 w-4 text-blue-700" />
-              Matrícula
+              Precio del curso
             </label>
             <div className="relative mt-2">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500">
@@ -124,13 +124,13 @@ function CursoForm({ curso, onSubmit }: CursoFormProps) {
                 type="number"
                 step="0.01"
                 min="0"
-                {...register("matricula", { valueAsNumber: true })}
+                {...register("precio", { valueAsNumber: true })}
                 className="w-full rounded-md border border-gray-300 py-2.5 pl-10 pr-3 text-sm text-gray-900 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15"
               />
             </div>
-            {errors.matricula && (
+            {errors.precio && (
               <p className="mt-1.5 text-xs font-medium text-red-600">
-                {errors.matricula.message}
+                {errors.precio.message}
               </p>
             )}
           </div>
@@ -138,7 +138,7 @@ function CursoForm({ curso, onSubmit }: CursoFormProps) {
           <div>
             <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
               <DollarSign className="h-4 w-4 text-blue-700" />
-              Mensualidad
+              Precio de matrícula
             </label>
             <div className="relative mt-2">
               <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm font-medium text-gray-500">
@@ -148,13 +148,13 @@ function CursoForm({ curso, onSubmit }: CursoFormProps) {
                 type="number"
                 step="0.01"
                 min="0"
-                {...register("mensualidad", { valueAsNumber: true })}
+                {...register("precio_matricula", { valueAsNumber: true })}
                 className="w-full rounded-md border border-gray-300 py-2.5 pl-10 pr-3 text-sm text-gray-900 outline-none transition focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15"
               />
             </div>
-            {errors.mensualidad && (
+            {errors.precio_matricula && (
               <p className="mt-1.5 text-xs font-medium text-red-600">
-                {errors.mensualidad.message}
+                {errors.precio_matricula.message}
               </p>
             )}
           </div>

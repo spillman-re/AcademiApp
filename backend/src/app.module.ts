@@ -9,6 +9,13 @@ import { ProfesorModule } from './profesor/profesor.module';
 import { AsignacionProfesorModule } from './asignacion-profesor/asignacion-profesor.module';
 import { InscripcionModule } from './inscripcion/inscripcion.module';
 import { SesionClaseModule } from './sesion-clase/sesion-clase.module';
+import { AsistenciaModule } from './asistencia/asistencia.module';
+import { EvaluacionModule } from './evaluacion/evaluacion.module';
+import { ResultadoEvaluacionModule } from './resultado-evaluacion/resultado-evaluacion.module';
+import { ObligacionPagoModule } from './obligacion-pago/obligacion-pago.module';
+import { PagoModule } from './pago/pago.module';
+import { ProrrogaModule } from './prorroga/prorroga.module';
+import { CertificadoModule } from './certificado/certificado.module';
 
 @Module({
   imports: [
@@ -16,7 +23,7 @@ import { SesionClaseModule } from './sesion-clase/sesion-clase.module';
       isGlobal: true,
     }),
     DatabaseModule,    
-    CursoModule, GrupoModule, HorarioClaseModule, EstudianteModule, ProfesorModule, AsignacionProfesorModule, InscripcionModule, SesionClaseModule,
+    CursoModule, GrupoModule, HorarioClaseModule, EstudianteModule, ProfesorModule, AsignacionProfesorModule, InscripcionModule, SesionClaseModule, AsistenciaModule, EvaluacionModule, ResultadoEvaluacionModule, ObligacionPagoModule, PagoModule, ProrrogaModule, CertificadoModule,
   ]  
 })
 export class AppModule {}

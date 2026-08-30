@@ -2,6 +2,8 @@ import type { Grupo } from "../types/grupo";
 
 type ActualizarGrupoData = {
   nombre_grupo: string;
+  duracion_meses?: number;
+  fecha_inicio?: string;
 };
 
 const API_URL = "http://localhost:3000/grupos";

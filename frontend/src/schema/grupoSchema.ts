@@ -1,15 +1,19 @@
 import { z } from "zod";
 
+const duracionMesesSchema = z.coerce
+  .number({
+    invalid_type_error: "La duración debe ser un número",
+  })
+  .int("La duración debe ser un número entero")
+  .min(1, "La duración debe ser mayor a 0");
+
 export const crearGrupoSchema = z.object({
   nombre_grupo: z
     .string()
     .min(1, "El nombre del grupo es obligatorio")
     .max(100, "El nombre no puede superar los 100 caracteres"),
 
-  duracion: z
-    .string()
-    .optional()
-    .transform((value) => value ?? ""),
+  duracion_meses: duracionMesesSchema,
 
   fecha_inicio: z
     .string()
@@ -22,10 +26,7 @@ export const actualizarGrupoSchema = z.object({
     .min(1, "El nombre del grupo es obligatorio")
     .max(100, "El nombre no puede superar los 100 caracteres"),
 
-  duracion: z
-    .string()
-    .optional()
-    .transform((value) => value ?? ""),
+  duracion_meses: duracionMesesSchema,
 });
 
 export function esCrearGrupoFormData(

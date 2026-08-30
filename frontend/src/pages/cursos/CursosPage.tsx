@@ -184,19 +184,20 @@ function CursosPage() {
     try {
       setError("");
 
-      const duracionLocal = data.duracion ?? "";
+      const duracionMeses = Number(data.duracion_meses);
 
       if (grupoSeleccionado) {
         const grupoActualizado = await actualizarGrupo(
           grupoSeleccionado.id_grupo,
           {
             nombre_grupo: data.nombre_grupo,
+            duracion_meses: duracionMeses,
           }
         );
 
         const grupoConDuracion = {
           ...grupoActualizado,
-          duracion: duracionLocal,
+          duracion_meses: Number(grupoActualizado.duracion_meses ?? duracionMeses),
         };
 
         setGrupos((gruposActuales) =>
@@ -215,11 +216,12 @@ function CursosPage() {
           id_curso: cursoParaGrupo.id_curso,
           nombre_grupo: data.nombre_grupo,
           fecha_inicio: data.fecha_inicio,
+          duracion_meses: duracionMeses,
         });
 
         const nuevoGrupoConDuracion = {
           ...nuevoGrupo,
-          duracion: duracionLocal,
+          duracion_meses: Number(nuevoGrupo.duracion_meses ?? duracionMeses),
         };
 
         setGrupos((gruposActuales) => [
