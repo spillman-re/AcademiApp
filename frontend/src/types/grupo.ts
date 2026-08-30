@@ -3,5 +3,6 @@ export interface Grupo {
   id_curso: number;
   nombre_grupo: string;
   fecha_inicio: string;
+  duracion?: string;
   estado: string;
 }

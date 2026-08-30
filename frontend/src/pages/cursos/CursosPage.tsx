@@ -153,6 +153,15 @@ function CursosPage() {
     try {
       setError("");
 
+      const cursoActual = cursos.find((curso) => curso.id_curso === id);
+
+      if (cursoActual && cursoActual.estado.toUpperCase() === "FINALIZADO") {
+        setCursos((cursosActuales) =>
+          cursosActuales.filter((curso) => curso.id_curso !== id)
+        );
+        return;
+      }
+
       await eliminarCursoApi(id);
 
       setCursos((cursosActuales) =>
@@ -175,6 +184,8 @@ function CursosPage() {
     try {
       setError("");
 
+      const duracionLocal = data.duracion ?? "";
+
       if (grupoSeleccionado) {
         const grupoActualizado = await actualizarGrupo(
           grupoSeleccionado.id_grupo,
@@ -183,10 +194,15 @@ function CursosPage() {
           }
         );
 
+        const grupoConDuracion = {
+          ...grupoActualizado,
+          duracion: duracionLocal,
+        };
+
         setGrupos((gruposActuales) =>
           gruposActuales.map((grupo) =>
-            grupo.id_grupo === grupoActualizado.id_grupo
-              ? grupoActualizado
+            grupo.id_grupo === grupoConDuracion.id_grupo
+              ? grupoConDuracion
               : grupo
           )
         );
@@ -201,18 +217,25 @@ function CursosPage() {
           fecha_inicio: data.fecha_inicio,
         });
 
+        const nuevoGrupoConDuracion = {
+          ...nuevoGrupo,
+          duracion: duracionLocal,
+        };
+
         setGrupos((gruposActuales) => [
           ...gruposActuales,
-          nuevoGrupo,
+          nuevoGrupoConDuracion,
         ]);
       }
 
       cerrarModalGrupo();
-    } catch {
+    } catch (error) {
       setError(
-        grupoSeleccionado
-          ? "No se pudo actualizar el grupo"
-          : "No se pudo crear el grupo"
+        error instanceof Error
+          ? error.message
+          : grupoSeleccionado
+            ? "No se pudo actualizar el grupo"
+            : "No se pudo crear el grupo"
       );
     }
   }

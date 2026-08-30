@@ -6,6 +6,11 @@ export const crearGrupoSchema = z.object({
     .min(1, "El nombre del grupo es obligatorio")
     .max(100, "El nombre no puede superar los 100 caracteres"),
 
+  duracion: z
+    .string()
+    .optional()
+    .transform((value) => value ?? ""),
+
   fecha_inicio: z
     .string()
     .min(1, "La fecha de inicio es obligatoria"),
@@ -16,6 +21,11 @@ export const actualizarGrupoSchema = z.object({
     .string()
     .min(1, "El nombre del grupo es obligatorio")
     .max(100, "El nombre no puede superar los 100 caracteres"),
+
+  duracion: z
+    .string()
+    .optional()
+    .transform((value) => value ?? ""),
 });
 
 export function esCrearGrupoFormData(

@@ -1,5 +1,5 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { CalendarDays, Plus, Save, Users } from "lucide-react";
+import { CalendarDays, Clock3, Plus, Save, Users } from "lucide-react";
 import { useEffect } from "react";
 import { useForm } from "react-hook-form";
 
@@ -31,6 +31,7 @@ function GrupoForm({ grupo, onSubmit }: GrupoFormProps) {
     ),
     defaultValues: {
       nombre_grupo: "",
+      duracion: "",
       ...(grupo ? {} : { fecha_inicio: "" }),
     },
   });
@@ -38,6 +39,7 @@ function GrupoForm({ grupo, onSubmit }: GrupoFormProps) {
   useEffect(() => {
     reset({
       nombre_grupo: grupo?.nombre_grupo ?? "",
+      duracion: grupo?.duracion ?? "",
       ...(grupo ? {} : { fecha_inicio: "" }),
     });
   }, [grupo, reset]);
@@ -58,7 +60,7 @@ function GrupoForm({ grupo, onSubmit }: GrupoFormProps) {
         <div className="flex items-center gap-3">
           <Users className="h-5 w-5 text-blue-200" />
           <div>
-            <p className="text-base font-semibold">Información del grupo</p>
+            <p className="text-base font-semibold text-white">Información del grupo</p>
             <p className="mt-1 text-sm text-blue-200">
               Organiza una nueva sección para este curso.
             </p>
@@ -82,6 +84,25 @@ function GrupoForm({ grupo, onSubmit }: GrupoFormProps) {
           {errors.nombre_grupo && (
             <p className="mt-1.5 text-xs font-medium text-red-600">
               {errors.nombre_grupo.message}
+            </p>
+          )}
+        </div>
+
+        <div>
+          <label className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+            <Clock3 className="h-4 w-4 text-blue-700" />
+            Duración del grupo
+          </label>
+
+          <input
+            {...register("duracion")}
+            placeholder="Ej. 3 meses"
+            className="mt-2 w-full rounded-md border border-gray-300 px-3 py-2.5 text-sm text-gray-900 outline-none transition placeholder:text-gray-400 focus:border-blue-600 focus:ring-2 focus:ring-blue-600/15"
+          />
+
+          {"duracion" in errors && errors.duracion && (
+            <p className="mt-1.5 text-xs font-medium text-red-600">
+              {errors.duracion.message}
             </p>
           )}
         </div>

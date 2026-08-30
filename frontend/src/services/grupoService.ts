@@ -6,6 +6,15 @@ type ActualizarGrupoData = {
 
 const API_URL = "http://localhost:3000/grupos";
 
+async function leerMensajeDeError(response: Response): Promise<string> {
+  try {
+    const texto = await response.text();
+    return texto || "No se pudo completar la solicitud.";
+  } catch {
+    return "No se pudo completar la solicitud.";
+  }
+}
+
 export async function obtenerGrupos(): Promise<Grupo[]> {
   const response = await fetch(API_URL);
 
@@ -28,7 +37,8 @@ export async function crearGrupo(
   });
 
   if (!response.ok) {
-    throw new Error("No se pudo crear el grupo");
+    const detalle = await leerMensajeDeError(response);
+    throw new Error(detalle || "No se pudo crear el grupo");
   }
 
   return response.json();
@@ -57,7 +67,8 @@ export async function actualizarGrupo(
   });
 
   if (!response.ok) {
-    throw new Error("No se pudo actualizar el grupo");
+    const detalle = await leerMensajeDeError(response);
+    throw new Error(detalle || "No se pudo actualizar el grupo");
   }
 
   return response.json();
