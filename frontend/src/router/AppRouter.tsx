@@ -4,6 +4,7 @@ import MainLayout from "../components/layout/MainLayout";
 import DashboardPage from "../pages/dashboard/DashboardPage";
 import CursosPage from "../pages/cursos/CursosPage";
 import ProfesoresPage from "../pages/profesores/ProfesoresPage";
+import EstudiantesPage from "../pages/estudiantes/EstudiantesPage";
 
 function AppRouter() {
   return (
@@ -19,6 +20,8 @@ function AppRouter() {
         <Route path="/cursos" element={<CursosPage />} />
 
         <Route path="/profesores" element={<ProfesoresPage />} />
+
+        <Route path="/estudiantes" element={<EstudiantesPage />} />
       </Route>
     </Routes>
   );
