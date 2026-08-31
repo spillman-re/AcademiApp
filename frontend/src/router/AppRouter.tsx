@@ -5,6 +5,7 @@ import DashboardPage from "../pages/dashboard/DashboardPage";
 import CursosPage from "../pages/cursos/CursosPage";
 import ProfesoresPage from "../pages/profesores/ProfesoresPage";
 import EstudiantesPage from "../pages/estudiantes/EstudiantesPage";
+import InscripcionesPage from "../pages/inscripciones/InscripcionesPage";
 
 function AppRouter() {
   return (
@@ -22,6 +23,8 @@ function AppRouter() {
         <Route path="/profesores" element={<ProfesoresPage />} />
 
         <Route path="/estudiantes" element={<EstudiantesPage />} />
+
+        <Route path="/inscripciones" element={<InscripcionesPage />} />
       </Route>
     </Routes>
   );
